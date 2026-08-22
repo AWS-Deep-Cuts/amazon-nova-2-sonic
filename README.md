@@ -30,7 +30,6 @@ AWS Deep Cutsは、AWS の最新のサービスやニッチな機能、または
 
 - Python 3.9 以上
 - AWS CLI 設定済み (`aws configure`)
-- Bedrock コンソール (ap-northeast-1) で `Amazon Nova 2 Sonic` のモデルアクセスが有効
 - マイク付きの PC + Chrome / Edge ブラウザ
 
 ### １．セットアップ + サーバー起動

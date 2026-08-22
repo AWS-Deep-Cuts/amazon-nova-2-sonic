@@ -4,14 +4,13 @@
 #
 # このスクリプトは以下を行います:
 #   1. AWS 認証確認
-#   2. Bedrock モデルアクセス確認
+#   2. Bedrock モデル疎通確認
 #   3. Python 依存パッケージ確認/インストール
 #   4. WebSocket 中継サーバーの起動
 #
 # 前提:
 #   - Python 3.9+ がインストールされていること
 #   - AWS CLI 認証が設定済みであること (aws configure)
-#   - Bedrock で amazon.nova-2-sonic-v1:0 のモデルアクセスが有効であること
 
 set -euo pipefail
 
@@ -38,8 +37,8 @@ ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text 2>/dev/n
 echo "  Account: ${ACCOUNT_ID} ✓"
 echo ""
 
-# ─── Step 2: Bedrock モデルアクセス確認 ───────────────────────
-echo "Step 2/4: Bedrock モデルアクセスを確認"
+# ─── Step 2: Bedrock モデル疎通確認 ───────────────────────────
+echo "Step 2/4: Bedrock モデル疎通を確認"
 MODEL_CHECK=$(aws bedrock get-foundation-model \
   --model-identifier "${MODEL_ID}" \
   --region "${AWS_REGION}" \
@@ -47,14 +46,17 @@ MODEL_CHECK=$(aws bedrock get-foundation-model \
   --output text 2>/dev/null) || true
 
 if [ "${MODEL_CHECK}" = "${MODEL_ID}" ]; then
-  echo "  ${MODEL_ID}: アクセス可能 ✓"
+  echo "  ${MODEL_ID}: OK ✓"
 else
   echo ""
-  echo "  ⚠️  モデルにアクセスできません。"
+  echo "  ⚠️  モデル情報を取得できません。"
   echo ""
-  echo "  対処方法:"
-  echo "    1. Bedrock コンソール → Model access → ${MODEL_ID} を有効化"
-  echo "    2. リージョン確認 (対応: us-east-1, us-west-2, ap-northeast-1, eu-north-1)"
+  echo "  確認事項:"
+  echo "    1. IAM に bedrock 関連権限があるか"
+  echo "    2. リージョンが正しいか (現在: ${AWS_REGION})"
+  echo "       対応: us-east-1, us-west-2, ap-northeast-1, eu-north-1"
+  echo ""
+  echo "  ※ 2025年10月以降、手動でのモデル有効化は不要です。"
   echo ""
   echo "  リージョンを変更する場合:"
   echo "    export AWS_REGION=us-east-1 && bash setup.sh"
