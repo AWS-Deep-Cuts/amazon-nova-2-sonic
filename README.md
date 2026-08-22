@@ -1,42 +1,84 @@
-# AWS Deep Cuts: Amazon Nova 2 Sonic
+# Amazon Nova 2 Sonic
 
-このディレクトリは、Amazon Nova 2 Sonic を題材にした技術ブログ記事とハンズオン資材をまとめたものです。
+このリポジトリは AWS Deep Cuts の、Amazon Nova 2 Sonic に関するハンズオンコンテンツです。
 
-Nova 2 Sonic の双方向音声ストリーミング API を CloudShell 上で段階的に動かし、speech-to-speech モデルの仕組み・主要機能・設計上の制約を一通り体験します。
+<!-- TODO: 記事公開後にリンクを追加 -->
+<!-- Amazon Nova 2 Sonicの解説記事(Qiita)は[こちら]() -->
 
-## 構成
+---
 
-```text
-Amazon-Nova-2-Sonic/
-├── README.md
-├── article.md
-└── hands-on/
-    ├── setup.sh                       # セットアップ (モデルアクセス確認のみ)
-    ├── 01_basic_conversation.py       # 基本の双方向ストリーミング
-    ├── 02_voice_and_sensitivity.py    # voiceId・感度の切り替え
-    ├── 03_cross_modal_and_tools.py    # Cross-modal input + Tool use
-    ├── 04_realtime_microphone.py      # マイク入力のリアルタイム会話 (ローカル用)
-    ├── generate_results.py            # 結果 HTML 生成 (各スクリプトが自動呼び出し)
-    └── cleanup.sh                     # 出力ファイル削除
+**AWS Deep Cuts**は、AWS の最新のサービスやニッチな機能、または高度にアカデミックな知識を要求するサービスなど、多くの人が知らない 『隠れた名曲 = **Deep Cuts**』 を深くまで掘り下げる技術シリーズです。
+
+このようなサービスはWeb情報も少なく、初学者は気軽にキャッチアップできないのが実情です。
+
+そこで AWS Deep Cuts シリーズでは、**前提知識も含めた分かりやすいサービス解説** と **手順通りに進めれば誰でも再現できるハンズオン** を提供します！
+
+## ハンズオンのゴール
+
+このハンズオンでは、Amazon Nova 2 Sonic の双方向音声ストリーミング API を CloudShell から実行し、以下を体験します。
+
+- テキスト入力で AI に話しかけ、音声応答を WAV ファイルとして取得する
+- voiceId (matthew / tiffany / amy) を切り替えて声質の違いを聴き比べる
+- ポリグロットボイスで英語・フランス語・スペイン語の応答を確認する
+- Tool use（関数呼び出し）で AI に構造化された発話評価を行わせる
+
+生成された `output/results.html` をブラウザで開くと、音声再生・トランスクリプト・学習ポイントをまとめて確認できます。
+
+## ハンズオン手順
+
+以降の手順は、ハンズオン用に用意した AWS アカウントで実施してください。
+
+### １．事前準備
+
+Bedrock コンソール（ap-northeast-1）を開き、**Model access** で `Amazon Nova 2 Sonic` を有効化してください。
+
+### ２．ハンズオンの実行
+
+CloudShell で以下のコマンドを実行してください。
+
+```bash
+# このリポジトリをクローン
+git clone https://github.com/AWS-Deep-Cuts/amazon-nova-2-sonic.git
+cd amazon-nova-2-sonic/hands-on
+
+# セットアップ + ハンズオン実行
+bash ./setup.sh
 ```
 
-## ハンズオンの流れ
+setup.sh は以下を順番に実行します（追加のパッケージインストールは不要です）。
 
-1. [article.md](./article.md) を読み、Nova 2 Sonic の概要・アーキテクチャ・制約を確認する
-2. Bedrock コンソールで `amazon.nova-2-sonic-v1:0` のモデルアクセスを有効化する
-3. CloudShell を開き、リポジトリを clone する
-4. `hands-on/setup.sh` を実行する（認証確認 → ハンズオン実行 → 結果HTML生成まで自動）
-5. スクリプトが出力したパスに従い `output/results.html` をダウンロードしてブラウザで開く
-6. ブラウザ上で音声再生・トランスクリプト・学習ポイントを確認する
-7. 確認後、`hands-on/cleanup.sh` で出力ファイルを削除する
+1. AWS 認証の確認
+2. Bedrock モデルアクセスの確認
+3. **Step 1**: 基本の双方向ストリーミング — テキスト注入で AI と会話し、WAV を保存
+4. **Step 2**: voiceId の聴き比べ — 3 種類の声 × 3 言語で応答を比較
+5. **Step 3**: Cross-modal input + Tool use — マルチターン会話で発話評価ツールを呼び出し
+6. 結果 HTML の生成
 
-## 注意事項
+### ３．結果の確認
 
-- Nova 2 Sonic は Bedrock のオンデマンド API のため、AWS リソースの作成・削除は不要です。ハンズオン中の API 呼び出し分のみ課金されます。
-- ハンズオン全体 (Step 1〜3) で概算 $0.05 以下です。
-- Step 4 (マイク入力) は CloudShell では実行できません。ローカル PC で pyaudio をインストールして試してください。
-- Nova 2 Sonic の接続は最大 8 分で切断されます。長時間の利用にはセッション再接続が必要です。
+setup.sh が完了すると、`output/results.html` のダウンロードパスが表示されます。
 
-## ライセンス
+CloudShell の場合:
+1. **Actions** → **Download file** をクリック
+2. 表示されたパス（例: `/home/cloudshell-user/amazon-nova-2-sonic/hands-on/output/results.html`）を入力
+3. ダウンロードした HTML をブラウザで開く
 
-MIT License
+ブラウザ上で以下を確認できます:
+- 各 Step で生成された音声 (WAV) の再生
+- AI の応答トランスクリプト
+- Nova 2 Sonic の学習ポイントまとめ
+
+### ４．後片付け
+
+Nova 2 Sonic は Bedrock のオンデマンド API のため、AWS リソースの削除は不要です。出力ファイルのみ削除します。
+
+```bash
+bash ./cleanup.sh
+```
+
+ローカル環境の場合:
+
+```bash
+cd ../..
+rm -rf amazon-nova-2-sonic
+```
