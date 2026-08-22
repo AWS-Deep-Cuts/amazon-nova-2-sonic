@@ -8,46 +8,48 @@ AWS Deep Cuts は、AWS の中でも特に最新のサービスやニッチな�
 
 :::note info
 ハンズオン教材は GitHub でも公開しています。
-https://github.com/Kenta-Matsuda/AWS-Deep-Cuts
+https://github.com/AWS-Deep-Cuts/amazon-nova-2-sonic
 :::
 
 # はじめに
 
-Amazon Nova 2 Sonic は、音声の理解と生成を1つのモデルに統合した speech-to-speech 基盤モデルです。従来の「音声認識 → テキスト処理 → 音声合成」という3段パイプラインを単一のAPI呼び出しで置き換え、ターン間レイテンシ約100msのリアルタイム音声対話を実現します。
+Amazon Nova 2 Sonic は、音声の理解と生成を1つのモデルに統合した speech-to-speech 基盤モデルです。従来の「音声認識 → テキスト処理 → 音声合成」という3段パイプラインを単一の API 呼び出しで置き換え、ターン間レイテンシ約 100ms のリアルタイム音声対話を実現します。
 
-この記事では Nova 2 Sonic の仕組みを解説し、CloudShell 上で段階的に動かすハンズオンを通じて、双方向ストリーミング・voiceId切り替え・ターン検出制御・テキスト注入・ツール呼び出しといった主要機能と、8分接続制限・55秒タイムアウトなどの設計上の制約を一通り体験します。
-
-**edTech への応用可能性**: Nova 2 Sonic の低レイテンシ音声対話は、AI英語講師・リアルタイム発話評価・アダプティブ学習などの教育サービス基盤として大きな可能性を持ちます。本記事ではそうした応用を見据えながら、まずモデルの基本動作を正確に理解することに集中します。
+この記事では Nova 2 Sonic の仕組みを解説し、CloudShell 上で段階的に動かすハンズオンを通じて、双方向ストリーミング・voiceId 切り替え・ターン検出制御・テキスト注入・ツール呼び出しといった主要機能と、8 分接続制限・55 秒タイムアウトなどの設計上の制約を一通り体験します。
 
 # 1. Amazon Nova 2 Sonic とは
 
-## 1.1 ポジショニング
+Amazon Nova 2 Sonic は、Amazon Bedrock 上で利用できる speech-to-speech 基盤モデルです。音声入力をリアルタイムで理解し、テキスト応答の生成と音声合成を同時に行います。
 
-| 従来のアプローチ | Nova 2 Sonic |
-|---|---|
-| Transcribe → Claude → Polly の3サービス | 単一モデルで ASR + 応答生成 + TTS |
-| ターン間レイテンシ 3〜7秒 | ターン間レイテンシ ~100ms |
-| 各サービスの設定・統合が必要 | 1つの API 呼び出し |
-| 割り込み（barge-in）は自前実装 | ネイティブ barge-in サポート |
+従来のアプローチとの違いを整理します。
 
-## 1.2 主要スペック
+| 項目 | 従来 (Transcribe + Claude + Polly) | Nova 2 Sonic |
+| -- | -- | -- |
+| アーキテクチャ | 3 サービスを連結 | 単一モデル |
+| ターン間レイテンシ | 3〜7 秒 | ~100ms |
+| 割り込み (barge-in) | 自前実装が必要 | ネイティブサポート |
+| API 呼び出し | 3 回 | 1 回 |
+
+主なスペックは次の通りです。
 
 | 項目 | 値 |
-|---|---|
+| -- | -- |
 | モデル ID | `amazon.nova-2-sonic-v1:0` |
 | API | `InvokeModelWithBidirectionalStream` |
 | 音声入力 | PCM 16kHz 16bit mono (base64) |
 | 音声出力 | PCM 8/16/24kHz 16bit mono (base64) |
 | コンテキストウィンドウ | 1M トークン |
 | 最大出力 | 64K トークン |
-| 接続制限 | **8分**（以降は再接続が必要） |
-| 無音タイムアウト | **55秒**（音声入力がないと切断） |
+| 接続制限 | 8 分 |
+| 無音タイムアウト | 55 秒 |
 | 利用可能リージョン | us-east-1, us-west-2, ap-northeast-1, eu-north-1 |
 
-## 1.3 対応言語と voiceId
+## 1.1 対応言語と voiceId
+
+Nova 2 Sonic は 7 言語をサポートし、言語ごとに男性/女性の声が用意されています。
 
 | 言語 | 女性 | 男性 | ポリグロット |
-|---|---|---|---|
+| -- | -- | -- | -- |
 | English (US) | tiffany | matthew | Yes |
 | English (UK) | amy | — | No |
 | English (AU) | olivia | — | No |
@@ -59,264 +61,243 @@ Amazon Nova 2 Sonic は、音声の理解と生成を1つのモデルに統合�
 | Portuguese | carolina | leo | No |
 | Hindi | kiara | arjun | No |
 
-`matthew` と `tiffany` はポリグロットボイスで、7言語全てを同じ声で話せます。
+`matthew` と `tiffany` はポリグロットボイスで、全対応言語を同じ声で話せます。多言語アプリケーションでは voiceId を固定したまま言語だけ切り替えられるため便利です。
 
-**制約**: 1セッション = 1 voiceId。セッション途中で声を変えることはできません。
+1 セッションにつき 1 つの voiceId しか使えない点には注意してください。複数のキャラクターを同時に出すには複数セッションが必要です。
 
-# 2. アーキテクチャ — 双方向ストリーミング
+## 1.2 双方向ストリーミングの仕組み
 
-## 2.1 全体像
+Nova 2 Sonic は HTTP のリクエスト-レスポンスではなく、1 つの接続上で入出力が同時に流れ続けるイベント駆動のストリーミング方式です。
 
-```
+```text
 ┌────────────────┐         ┌────────────────┐
 │  クライアント    │ Stream  │  Nova 2 Sonic  │
-│  (Python等)    │ ←─────→ │  (Bedrock)     │
+│  (Python 等)   │ ←─────→ │  (Bedrock)     │
 │                │         │                │
 │ 入力イベント →  │         │  → 出力イベント │
 │ (audio/text)   │         │  (audio/text)  │
 └────────────────┘         └────────────────┘
 ```
 
-従来の HTTP リクエスト-レスポンスではなく、1つの接続上で入出力が同時に流れ続けます。
+イベントは以下の順序で送信します。
 
-## 2.2 イベントシーケンス
-
+```text
+sessionStart                ← 推論設定 + ターン検出設定
+promptStart                 ← 音声出力設定 + ツール設定
+contentStart(SYSTEM)        ← システムプロンプト開始
+textInput                   ← プロンプト本文
+contentEnd                  ← システムプロンプト終了
+contentStart(AUDIO)         ← 音声入力ストリーム開始
+audioInput × N              ← マイク音声の連続送信 (32ms 単位)
+[textInput]                 ← Cross-modal テキスト注入 (任意)
+contentEnd(AUDIO)           ← 音声入力ストリーム終了
+promptEnd → sessionEnd      ← セッション終了
 ```
-sessionStart                 ← 推論設定 + ターン検出設定
-promptStart                  ← 音声出力設定 + ツール設定
-contentStart(SYSTEM) + textInput + contentEnd  ← システムプロンプト
-contentStart(AUDIO)          ← 音声入力ストリーム開始
-audioInput × N               ← マイク音声の連続送信 (32ms 単位)
-[textInput]                  ← Cross-modal テキスト注入 (任意)
-contentEnd(AUDIO)            ← 音声入力ストリーム終了
-promptEnd → sessionEnd       ← セッション終了
-```
 
-**重要**: 音声入力ストリームは「常時開いたまま」が原則。閉じるとセッション終了に向かいます。
+音声入力ストリームは「常時開いたまま」が原則です。閉じるとセッション終了に向かいます。
 
-## 2.3 出力イベント
+## 1.3 出力イベント
+
+モデルからは以下のイベントが返ります。
 
 | イベント | 内容 |
-|---|---|
+| -- | -- |
 | `textOutput` (USER) | ユーザー発話の ASR テキスト |
 | `textOutput` (ASSISTANT) | AI の応答テキスト |
 | `audioOutput` | AI 音声チャンク (base64 PCM) |
 | `toolUse` | ツール呼び出しリクエスト |
 
-### SPECULATIVE vs FINAL
+テキスト出力の `contentStart` には `generationStage` が付きます。`SPECULATIVE` は音声生成前の予測で変更される可能性があり、`FINAL` は音声生成後の確定テキストです。UI に表示するトランスクリプトには FINAL のみを使ってください。
 
-テキスト出力の `contentStart` には `generationStage` が付きます:
+# 2. このハンズオンで作るもの
 
-- **SPECULATIVE**: 音声生成前のテキスト予測。変更される可能性あり。
-- **FINAL**: 音声生成後の確定テキスト。
+このハンズオンでは AWS リソースの作成は行いません。Bedrock のオンデマンド API を直接呼び出し、Nova 2 Sonic の各機能を段階的に体験します。
 
-UIに表示するトランスクリプトには FINAL のみを使うべきです。
+4 つの Python スクリプトで以下を確認します。
 
-# 3. 主要機能の詳細
+```text
+Step 1 (01_basic_conversation.py)
+  → 双方向ストリーミングの基本、サイレンスポンプ、Cross-modal text input
+  → AI の音声応答を WAV ファイルに保存
 
-## 3.1 サイレンスポンプ — 55秒タイムアウト対策
+Step 2 (02_voice_and_sensitivity.py)
+  → voiceId の聴き比べ (matthew / tiffany / amy)
+  → ポリグロットボイスで英語・フランス語・スペイン語の応答を確認
+  → endpointingSensitivity の解説
 
-Nova 2 Sonic は音声入力が55秒間途切れるとセッションを切断します。ユーザーが黙っている間も接続を維持するには、定期的に無音フレームを送信します。
+Step 3 (03_cross_modal_and_tools.py)
+  → マルチターン会話 (テキスト注入で模擬)
+  → Tool use (evaluate_english) の呼び出し観察
 
-```python
-# 16kHz 16bit mono の 32ms 分 = 1024 bytes のゼロ埋め
-silence_frame = base64.b64encode(b"\x00" * 1024).decode("ascii")
-
-# 150ms間隔で送信
-while is_active:
-    enqueue_event({"event": {"audioInput": {..., "content": silence_frame}}})
-    time.sleep(0.15)
+Step 4 (04_realtime_microphone.py) ※ ローカル PC のみ
+  → マイク入力 + スピーカー出力のリアルタイム会話
+  → barge-in と 8 分接続制限の体験
 ```
 
-## 3.2 Cross-modal Text Input
+# 3. 前提条件
 
-音声ストリームを維持したまま、テキストを注入して AI に応答させる公式機能です。
+- AWS アカウントを持っていること
+- CloudShell が使える、または Python 3.9 以上 + AWS CLI が設定済みの環境があること
+- Bedrock コンソールで `amazon.nova-2-sonic-v1:0` のモデルアクセスが有効化されていること
+- IAM に `bedrock:InvokeModelWithBidirectionalStream` 権限があること
 
-**ユースケース**:
-- AI から先に話しかける（Model-start-first パターン）
-- 会話の話題を誘導する
-- DTMF（電話のキー入力）をテキスト変換して送信する
+# 4. ハンズオン
 
-```python
-# テキスト注入の3イベント
-contentStart(TEXT, interactive=True, role="USER")
-textInput(content="Tell me about your weekend")
-contentEnd
-```
+## 4.1 セットアップ
 
-**制約**: 音声ストリームが切れた状態でテキストを送ると55秒タイムアウトで切断されます。Cross-modal input は「音声セッションの補助」であり、純粋な TTS の代替にはなりません。
-
-## 3.3 endpointingSensitivity — ターン検出制御
-
-`sessionStart` で設定する `endpointingSensitivity` は、ユーザーが話し終わったと判定するまでの待ち時間を制御します:
-
-| 値 | 動作 | 適したシーン |
-|---|---|---|
-| HIGH | 短い沈黙で即応答 (~1.5秒) | テンポの良い会話 |
-| MEDIUM | バランス型 | 一般的な対話 (推奨) |
-| LOW | 長い沈黙も待つ (~2秒) | 考えながら話す場面 |
-
-## 3.4 Tool Use (関数呼び出し)
-
-Nova 2 Sonic は会話中にツールを呼び出せます。`promptStart` でツールを定義し、モデルが必要と判断すると `toolUse` イベントを送信します。
-
-```python
-# ツール定義 (promptStart 内)
-"toolConfiguration": {
-    "tools": [{
-        "toolSpec": {
-            "name": "evaluate_english",
-            "description": "Evaluate student's English proficiency",
-            "inputSchema": {"json": {...}}
-        }
-    }],
-    "toolChoice": {"auto": {}}  # auto / any / tool
-}
-```
-
-**非同期ツールコール**: ツール実行中も会話が継続できるため、「分析中です」と言いながらバックグラウンドで処理する設計が可能です。
-
-## 3.5 Barge-in (割り込み)
-
-ユーザーが AI の発話中に話し始めると、Nova 2 Sonic は自動的に音声生成を中断し、ユーザーの発話を聞き始めます。クライアント側では未再生の音声キューをクリアする処理が必要です。
-
-# 4. 設計上の制約と対処法
-
-| 制約 | 対処法 |
-|---|---|
-| 8分接続制限 | セッション再接続 + 会話履歴の引き継ぎ |
-| 55秒無音タイムアウト | サイレンスポンプ (150ms間隔で無音送信) |
-| 1セッション = 1 voiceId | 複数キャラクターには複数セッション |
-| SSML 非対応 | プロンプト指示で発話速度・語彙レベルを制御 |
-| 純粋な TTS として使えない | 音声ストリーム維持が必須。TTS には Polly を使う |
-
-# 5. ハンズオン手順
-
-## 5.1 セットアップ
+CloudShell を開き、以下を実行します。
 
 ```bash
-# CloudShell を開いて実行
-git clone https://github.com/Kenta-Matsuda/AWS-Deep-Cuts.git
-cd AWS-Deep-Cuts/Amazon-Nova-2-Sonic/hands-on
+git clone https://github.com/AWS-Deep-Cuts/amazon-nova-2-sonic.git
+cd amazon-nova-2-sonic/hands-on
 bash setup.sh
 ```
 
-setup.sh が行うこと:
-1. AWS 認証の確認
-2. `pip install boto3` (pyaudio はオプション)
-3. Bedrock モデルアクセスの確認
+リージョンを変更する場合は環境変数を設定してから実行してください。
 
-## 5.2 Step 1: 基本の双方向ストリーミング
+```bash
+export AWS_REGION=ap-northeast-1
+bash setup.sh
+```
+
+setup.sh が行うことは以下の 3 ステップです。
+
+1. AWS 認証の確認 (`aws sts get-caller-identity`)
+2. Python パッケージのインストール (`pip install boto3`)
+3. Bedrock モデルアクセスの確認 (`aws bedrock get-foundation-model`)
+
+正常に完了すると次のような出力が表示されます。
+
+```text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AWS Deep Cuts - Amazon Nova 2 Sonic セットアップ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+リージョン: us-east-1
+モデル:     amazon.nova-2-sonic-v1:0
+
+Step 1/3: AWS 認証を確認
+  Account: 123456789012
+
+Step 2/3: Python 依存パッケージをインストール
+  boto3: OK
+  pyaudio: 未インストール (Step 4 のマイク入力は使えません — CloudShell では正常)
+
+Step 3/3: Bedrock モデルアクセスを確認
+  amazon.nova-2-sonic-v1:0: アクセス可能
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  セットアップ完了
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+## 4.2 Step 1: 基本の双方向ストリーミング
 
 ```bash
 python3 01_basic_conversation.py
 ```
 
-テキスト入力（Cross-modal）で AI に話しかけ、音声応答を WAV ファイルに保存します。
+このスクリプトは以下を行います。
 
-**確認ポイント**:
-- 音声入力ストリームを開くことが必須であること
-- サイレンスポンプの役割
-- 出力の `textOutput` と `audioOutput` の関係
+1. Nova 2 Sonic にセッションを開始する
+2. システムプロンプトで AI のペルソナを設定する
+3. 音声入力ストリームを開き、サイレンスポンプで接続を維持する
+4. Cross-modal text input でテキストを注入し、AI に話しかける
+5. AI の音声応答を `output/step1_response.wav` に保存する
 
-## 5.3 Step 2: voiceId と感度の切り替え
+実行すると AI の応答テキストがコンソールに表示され、音声が WAV ファイルに書き出されます。WAV ファイルは CloudShell からダウンロードして再生できます。
+
+**学習ポイント**:
+
+- Nova 2 Sonic は speech-to-speech モデルなので、テキストだけ送っても動きません。音声入力ストリームを開くことが必須です。
+- サイレンスポンプ: 55 秒間音声入力がないとタイムアウトします。無音データ (ゼロ埋め PCM) を定期送信して接続を維持します。
+- Cross-modal text input: 音声ストリームを維持したまま、テキストを注入して AI に音声で応答させることができます。
+
+## 4.3 Step 2: voiceId と感度の切り替え
 
 ```bash
 python3 02_voice_and_sensitivity.py
 ```
 
-3種類の voiceId (matthew/tiffany/amy) で同じ質問に答えさせ、WAV を聴き比べます。さらに matthew のポリグロット機能で英語・フランス語・スペイン語の応答を確認します。
+このスクリプトは以下を行います。
 
-**確認ポイント**:
-- 声質の違い (matthew=米国男性、tiffany=米国女性、amy=英国女性)
-- ポリグロットボイスは voiceId を変えずに言語を切り替えられること
-- endpointingSensitivity は音声入力時に効果を発揮すること
+1. 同じ質問を `matthew` / `tiffany` / `amy` の 3 種類の声で応答させ、WAV を保存する
+2. `matthew` (ポリグロット) に英語・フランス語・スペイン語で話しかけ、言語切り替えを確認する
+3. `endpointingSensitivity` (HIGH / MEDIUM / LOW) の動作を解説する
 
-## 5.4 Step 3: Cross-modal input + Tool use
+`output/` ディレクトリに複数の WAV ファイルが出力されます。ダウンロードして聴き比べてください。
+
+**学習ポイント**:
+
+- 1 セッション = 1 voiceId の制約があります。セッション途中で声を変えることはできません。
+- ポリグロットボイス (matthew, tiffany) は voiceId を変えずに言語を切り替えられます。
+- `endpointingSensitivity` はマイク入力時に効果を発揮します。LOW は初心者向け（長い沈黙を待つ）、HIGH は上級者向け（素早く応答）です。
+
+## 4.4 Step 3: Cross-modal input + Tool use
 
 ```bash
 python3 03_cross_modal_and_tools.py
 ```
 
-3ターンの模擬会話（意図的に文法ミスを含む英語）をテキスト注入で送信し、AI が `evaluate_english` ツールを呼び出すかを観察します。
+このスクリプトは以下を行います。
 
-**確認ポイント**:
-- toolConfiguration の定義方法
-- toolUse イベントの構造
-- toolChoice (auto/any/tool) の使い分け
+1. 3 ターンの模擬会話（意図的に文法ミスを含む英語）をテキスト注入で送信する
+2. AI が `evaluate_english` ツールを呼び出すかを観察する
+3. ツール呼び出しのパラメータ（スコア・フィードバック）を表示する
 
-## 5.5 Step 4: マイク入力リアルタイム会話 (ローカルPC)
+ツールが呼び出された場合、コンソールにスコアとフィードバックが表示されます。`toolChoice: auto` のため、モデルが不要と判断した場合は呼び出されないこともあります。
+
+**学習ポイント**:
+
+- Tool use の流れ: `promptStart` で定義 → モデルが `toolUse` イベントを送信 → アプリが `toolResult` で結果を返す
+- `toolChoice` の選択肢: `auto` (モデル判断)、`any` (必ずいずれか)、`tool` (特定ツール強制)
+- Nova 2 Sonic のツールコールは非同期で、実行中も会話が継続できます。
+
+## 4.5 Step 4: マイク入力リアルタイム会話 (ローカル PC)
+
+このステップは CloudShell では実行できません。マイクとスピーカーが必要です。
 
 ```bash
-# pyaudio が必要（CloudShell では実行不可）
-pip install pyaudio
+# pyaudio のインストール
+# macOS:   brew install portaudio && pip install pyaudio
+# Ubuntu:  sudo apt install portaudio19-dev && pip install pyaudio
+# Windows: pip install pyaudio
+
 python3 04_realtime_microphone.py --voice tiffany --sensitivity LOW
 ```
 
-マイクとスピーカーを使った本格的なリアルタイム会話を体験します。
+マイクに向かって英語で話しかけると、AI がリアルタイムで音声応答します。Ctrl+C で終了します。
 
-**確認ポイント**:
-- barge-in (AI が話している途中に割り込む) の動作
-- endpointingSensitivity の体感的な違い
-- 8分接続制限の警告
+**学習ポイント**:
 
-## 5.6 クリーンアップ
+- barge-in: AI が話している途中に割り込むと、AI は自動的に発話を中断して聞き始めます。
+- 8 分接続制限: 7 分経過時に警告が表示されます。本番では再接続ロジックが必要です。
+- `endpointingSensitivity` の違いが体感できます。LOW ではゆっくり考えながら話しても AI が被ってきません。
+
+# 5. クリーンアップ
 
 ```bash
 bash cleanup.sh
 ```
 
-Nova 2 Sonic は Bedrock のオンデマンド API のため AWS リソースの削除は不要です。出力 WAV ファイルのみ削除します。
+Nova 2 Sonic は Bedrock のオンデマンド API のため、AWS リソースの削除は不要です。このスクリプトは `output/` ディレクトリの WAV ファイルを削除するだけです。
 
-# 6. コストと料金
+CloudShell を使った場合、pip パッケージはセッション終了時に自動で消えます。
 
-| 項目 | 料金 |
-|---|---|
-| 音声入力 | $0.003 / 1,000 speech tokens |
-| 音声出力 | $0.012 / 1,000 speech tokens |
-| テキスト入出力 | 別途テキストトークン料金 |
+# 6. 学んだこと
 
-ハンズオン全体 (Step 1〜3) で概算 **$0.05 以下**。固定費なし。
+このハンズオンで体験した Nova 2 Sonic の特徴を整理します。
 
-# 7. edTech への応用展望
+- **Speech-to-Speech 統合モデル**: ASR + LLM + TTS の 3 サービス統合が不要。1 つの API 呼び出しで完結する。
+- **双方向ストリーミング**: リクエスト-レスポンスではなく常時接続。音声が両方向に同時に流れる。
+- **サイレンスポンプの必要性**: 55 秒の無音タイムアウトを回避するため、無音フレームを定期送信する必要がある。
+- **Cross-modal input**: 音声ストリームを維持したままテキストを注入でき、AI から能動的に話しかけるパターンが実現できる。
+- **Tool use**: 会話中にツール（関数）を呼び出し、構造化されたデータを取得できる。非同期実行にも対応。
+- **voiceId とポリグロット**: `matthew` / `tiffany` は 1 つの声で 7 言語に対応。1 セッション = 1 voiceId の制約あり。
+- **endpointingSensitivity**: ユーザーの発話終了を検出するタイミングを LOW / MEDIUM / HIGH で制御できる。
+- **8 分接続制限**: セッションは最大 8 分で切断される。本番では再接続 + 会話履歴引き継ぎの設計が必要。
 
-Nova 2 Sonic の特性は教育テクノロジーと特に相性が良いです:
-
-| 機能 | edTech 応用 |
-|---|---|
-| ~100ms レイテンシ | 人間同士の会話に近いAI英語講師 |
-| endpointingSensitivity | 学習者レベルに応じたアダプティブ応答 |
-| Tool use | リアルタイム発話評価・CEFR レベル判定 |
-| Cross-modal input | レッスン進行制御・話題誘導 |
-| ポリグロット | 1つのプラットフォームで多言語学習 |
-| プロンプト制御 | 語彙レベル・発話速度を難易度に連動 |
-
-**設計パターン例**:
-
-```
-[学習者のマイク] → Nova 2 Sonic (AI講師セッション)
-                      ↓ toolUse: evaluate_english
-                 [評価結果] → DynamoDB (学習履歴)
-                      ↓
-                 [次のレッスン設計] → sensitivity/prompt を動的調整
-```
-
-ただし本番化には以下の追加設計が必要です:
-- 8分制限のセッション再接続 + 会話コンテキスト引き継ぎ
-- WebSocket 中継サーバー (ブラウザから Bedrock に直接接続はできない)
-- 認証・レート制限・コスト管理
-
-# 8. まとめ
-
-| 理解すべきこと | このハンズオンでの体験 |
-|---|---|
-| 双方向ストリーミングの仕組み | Step 1: イベントシーケンスを手で組み立てる |
-| voiceId とポリグロット | Step 2: 3声×3言語の WAV を聴き比べ |
-| Cross-modal input の使い方 | Step 1-3: テキスト注入で会話を駆動 |
-| Tool use の設計パターン | Step 3: 発話評価ツールの呼び出し |
-| 55秒タイムアウトの回避 | Step 1: サイレンスポンプの実装 |
-| 8分制限の存在 | Step 4: 長時間会話での切断体験 |
-| SSML非対応の代替策 | Step 2: プロンプトによる発話制御 |
+Nova 2 Sonic の低レイテンシ音声対話は、edTech (AI 英語講師、リアルタイム発話評価、アダプティブ学習)、カスタマーサポート、テレフォニー統合など、リアルタイム音声が求められるビジネス領域に広い応用可能性を持っています。特に `endpointingSensitivity` による学習者レベル適応や、Tool use による構造化評価の取得は、教育サービスとの相性が良い設計パターンです。
 
 # 参考リンク
 
