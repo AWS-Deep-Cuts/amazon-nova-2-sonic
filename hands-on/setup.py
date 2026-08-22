@@ -153,7 +153,14 @@ def main():
 
     os.chdir(SCRIPT_DIR)
     os.environ["AWS_REGION"] = AWS_REGION
-    os.execv(sys.executable, [sys.executable, str(SCRIPT_DIR / "server.py")])
+    try:
+        proc = subprocess.Popen([sys.executable, str(SCRIPT_DIR / "server.py")])
+        proc.wait()
+    except KeyboardInterrupt:
+        # Ctrl+C を子プロセスに伝播（子プロセスも SIGINT を受ける）
+        proc.terminate()
+        proc.wait(timeout=5)
+        print("\n[setup] Server stopped")
 
 
 if __name__ == "__main__":

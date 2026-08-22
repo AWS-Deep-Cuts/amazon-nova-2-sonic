@@ -384,8 +384,24 @@ async def main():
     print("  Ctrl+C で停止します。")
     print("")
 
-    async with serve(handle_connection, HOST, PORT):
-        await asyncio.Future()  # 永続待機
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    # Windows / Unix 両対応のシグナルハンドラ
+    if sys.platform == "win32":
+        # Windows: signal.signal で SIGINT を捕捉
+        signal.signal(signal.SIGINT, lambda s, f: stop_event.set())
+    else:
+        # Unix: loop.add_signal_handler が使える
+        loop.add_signal_handler(signal.SIGINT, stop_event.set)
+
+    server = await serve(handle_connection, HOST, PORT)
+    try:
+        await stop_event.wait()
+    finally:
+        server.close()
+        await server.wait_closed()
+        print("\n[Server] Stopped — port released")
 
 
 if __name__ == "__main__":
