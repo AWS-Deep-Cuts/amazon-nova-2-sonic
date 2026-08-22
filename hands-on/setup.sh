@@ -18,6 +18,17 @@ AWS_REGION="${AWS_REGION:-ap-northeast-1}"
 MODEL_ID="amazon.nova-2-sonic-v1:0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Windows 環境では aws.exe を使う場合がある
+if command -v aws &>/dev/null; then
+  AWS_CMD="aws"
+elif command -v aws.exe &>/dev/null; then
+  AWS_CMD="aws.exe"
+else
+  echo "  ⚠️  AWS CLI が見つかりません。"
+  echo "  https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+  exit 1
+fi
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  AWS Deep Cuts - Amazon Nova 2 Sonic"
@@ -29,7 +40,7 @@ echo ""
 
 # ─── Step 1: AWS 認証確認 ─────────────────────────────────────
 echo "Step 1/4: AWS 認証を確認"
-ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text 2>/dev/null)" || {
+ACCOUNT_ID="$(${AWS_CMD} sts get-caller-identity --query Account --output text 2>/dev/null)" || {
   echo "  ⚠️  AWS 認証に失敗しました。"
   echo "  'aws configure' で認証情報を設定してください。"
   exit 1
@@ -39,7 +50,7 @@ echo ""
 
 # ─── Step 2: Bedrock モデル疎通確認 ───────────────────────────
 echo "Step 2/4: Bedrock モデル疎通を確認"
-MODEL_CHECK=$(aws bedrock get-foundation-model \
+MODEL_CHECK=$(${AWS_CMD} bedrock get-foundation-model \
   --model-identifier "${MODEL_ID}" \
   --region "${AWS_REGION}" \
   --query "modelDetails.modelId" \
