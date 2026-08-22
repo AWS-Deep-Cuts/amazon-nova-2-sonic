@@ -3,364 +3,448 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AWS Deep Cuts: Nova 2 Sonic Playground</title>
+  <title>Nova 2 Sonic Playground</title>
   <style>
     :root {
-      --bg: #0f1419;
-      --surface: #1a2332;
-      --surface-alt: #1e2a3a;
-      --border: #2d3f52;
-      --text: #e8edf2;
-      --text-muted: #8899aa;
+      --bg: #101820;
+      --surface: #1a2230;
+      --surface-raised: #222e3c;
+      --border: #2e3e50;
+      --text: #e4eaf0;
+      --text-dim: #7e90a4;
       --accent: #ff9900;
-      --accent-dim: #cc7a00;
-      --green: #22c55e;
-      --red: #ef4444;
-      --blue: #3b82f6;
+      --green: #34d399;
+      --red: #f87171;
+      --blue: #60a5fa;
       --purple: #a78bfa;
-      --radius: 8px;
-      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+      --radius: 10px;
+      --mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      padding: 24px;
-    }
-
-    .container { max-width: 1100px; margin: 0 auto; }
-
-    /* Header */
-    header {
       display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    header .logo {
-      background: var(--accent);
-      color: #000;
-      width: 40px; height: 40px;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 1.1rem;
-    }
-    header h1 { font-size: 1.2rem; font-weight: 600; }
-    header .subtitle { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
-
-    /* Layout */
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-    @media (max-width: 900px) {
-      .main-grid { grid-template-columns: 1fr; }
-    }
-
-    /* Cards */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      flex-direction: column;
       overflow: hidden;
     }
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface-alt);
-    }
-    .card-header h2 {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-    }
-    .card-body { padding: 14px; }
 
-    /* JSON Editor */
-    .json-editor {
-      width: 100%;
-      min-height: 180px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      line-height: 1.6;
-      padding: 12px;
-      resize: vertical;
-      outline: none;
-      tab-size: 2;
-    }
-    .json-editor:focus { border-color: var(--accent); }
-    .json-editor.error { border-color: var(--red); }
-
-    /* System Prompt */
-    .prompt-editor {
-      width: 100%;
-      min-height: 100px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.8rem;
-      line-height: 1.6;
-      padding: 12px;
-      resize: vertical;
-      outline: none;
-    }
-    .prompt-editor:focus { border-color: var(--accent); }
-
-    /* Buttons */
-    .btn {
-      padding: 6px 12px;
-      border: none;
-      border-radius: 4px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .btn:hover { opacity: 0.85; }
-    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
-    .btn-reset { background: var(--border); color: var(--text); }
-    .btn-accent { background: var(--accent); color: #000; }
-
-    /* Control bar */
-    .control-bar {
-      grid-column: 1 / -1;
+    /* ─── Top Bar ─── */
+    .topbar {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 14px;
+      padding: 10px 20px;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
-    .btn-start {
-      padding: 10px 28px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      border-radius: 6px;
+    .topbar h1 { font-size: 0.9rem; font-weight: 600; }
+    .topbar-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .badge {
+      font-size: 0.65rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+
+    /* ─── Main Layout ─── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ─── Control Strip ─── */
+    .control-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .btn-mic {
+      width: 48px; height: 48px;
+      border-radius: 50%;
       border: none;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
       transition: all 0.2s;
+      flex-shrink: 0;
     }
-    .btn-start.idle { background: var(--green); color: #fff; }
-    .btn-start.active { background: var(--red); color: #fff; }
-    .btn-start:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-mic.idle { background: var(--green); color: #000; }
+    .btn-mic.active { background: var(--red); color: #fff; animation: glow 1.5s infinite; }
+    @keyframes glow { 0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,0.4)} 50%{box-shadow:0 0 0 10px rgba(248,113,113,0)} }
 
-    .status-indicator {
+    .prompt-preview {
+      flex: 1;
+      min-width: 0;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .prompt-preview:hover { border-color: var(--accent); color: var(--text); }
+    .prompt-preview .label { color: var(--accent); font-weight: 600; margin-right: 6px; }
+
+    .btn-settings {
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface-raised);
+      color: var(--text);
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-settings:hover { border-color: var(--accent); color: var(--accent); }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    .status-pill .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+    .status-pill .dot.on { background: var(--green); animation: pulse 1.4s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ─── Log Area ─── */
+    .log-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+    .log-entry {
+      padding: 6px 10px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      max-width: 85%;
+      word-break: break-word;
+    }
+    .log-user { background: rgba(96,165,250,0.12); color: var(--blue); margin-left: auto; text-align: right; }
+    .log-assistant { background: rgba(52,211,153,0.12); color: var(--green); }
+    .log-system { background: rgba(255,153,0,0.08); color: var(--accent); font-size: 0.72rem; max-width: 100%; }
+    .log-tool { background: rgba(167,139,250,0.12); color: var(--purple); font-size: 0.72rem; }
+
+    /* ─── Text Input Bar ─── */
+    .input-bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .input-bar input {
+      flex: 1;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      outline: none;
+    }
+    .input-bar input:focus { border-color: var(--accent); }
+    .input-bar input::placeholder { color: var(--text-dim); }
+    .input-bar input:disabled { opacity: 0.4; }
+    .input-bar button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #000;
+      font-weight: 600;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .input-bar button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ─── Settings Panel (Slide-over) ─── */
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; }
+    .overlay.open { display: block; }
+    .settings-panel {
+      position: fixed;
+      top: 0; right: -460px;
+      width: 440px; max-width: 90vw;
+      height: 100%;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      z-index: 101;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.25s ease;
+    }
+    .settings-panel.open { right: 0; }
+    .settings-header {
+      display: flex;
+      align-items: center;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-header h2 { font-size: 0.9rem; font-weight: 600; }
+    .settings-header .close-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.3rem;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+    .settings-header .close-btn:hover { color: var(--text); }
+    .settings-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+    }
+    .field { margin-bottom: 18px; }
+    .field-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .field-label span {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--text-dim);
+    }
+    .field-label button {
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      background: var(--surface-raised);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .field-label button:hover { color: var(--accent); border-color: var(--accent); }
+    textarea.cfg {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.73rem;
+      line-height: 1.6;
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+    }
+    textarea.cfg:focus { border-color: var(--accent); }
+    textarea.cfg.prompt { font-family: inherit; font-size: 0.8rem; min-height: 120px; }
+    textarea.cfg.json { min-height: 140px; }
+    .field-note {
+      margin-top: 4px;
+      font-size: 0.67rem;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+    .toggle-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.78rem;
-      color: var(--text-muted);
+      font-size: 0.8rem;
+      color: var(--text);
     }
-    .status-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--text-muted);
-    }
-    .status-dot.active { background: var(--green); animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .toggle-row input { width: 16px; height: 16px; accent-color: var(--accent); }
 
-    .text-inject-bar {
-      flex: 1;
+    /* ─── Quick Settings (inline selects) ─── */
+    .quick-settings {
       display: flex;
-      gap: 8px;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 8px 0;
+      border-top: 1px solid var(--border);
+      margin-top: 12px;
     }
-    .text-inject-bar input {
-      flex: 1;
+    .quick-settings label {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .quick-settings select {
       background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 4px;
       color: var(--text);
-      padding: 8px 12px;
-      font-size: 0.8rem;
+      padding: 3px 6px;
+      font-size: 0.72rem;
       outline: none;
     }
-    .text-inject-bar input:focus { border-color: var(--accent); }
-    .text-inject-bar input::placeholder { color: var(--text-muted); }
 
-    /* Log */
-    .log-panel {
-      grid-column: 1 / -1;
-    }
-    .log {
-      height: 300px;
-      overflow-y: auto;
-      padding: 12px;
-      font-size: 0.78rem;
-      line-height: 1.7;
-      background: var(--bg);
-      border-radius: 4px;
-    }
-    .log-entry {
-      padding: 3px 8px;
-      border-radius: 3px;
-      margin-bottom: 3px;
-      word-break: break-word;
-    }
-    .log-user { background: rgba(59,130,246,0.15); color: #93c5fd; }
-    .log-assistant { background: rgba(34,197,94,0.15); color: #86efac; }
-    .log-system { background: rgba(255,153,0,0.12); color: var(--accent); font-size: 0.72rem; }
-    .log-tool { background: rgba(167,139,250,0.15); color: var(--purple); font-size: 0.72rem; }
-
-    /* Tool toggle */
-    .tool-section {
-      margin-top: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-    }
-    .tool-section input[type="checkbox"] {
-      width: 16px; height: 16px;
-      accent-color: var(--accent);
-    }
-
-    /* Helpers */
-    .section-label {
-      font-size: 0.68rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
-    }
-    .config-note {
-      font-size: 0.68rem;
-      color: var(--text-muted);
-      margin-top: 6px;
-      line-height: 1.4;
+    /* ─── Responsive ─── */
+    @media (max-width: 600px) {
+      .control-strip { flex-wrap: wrap; }
+      .prompt-preview { order: 10; flex-basis: 100%; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="logo">DC</div>
-      <div>
-        <h1>Nova 2 Sonic Playground</h1>
-        <div class="subtitle">AWS Deep Cuts &mdash; Bidirectional Speech-to-Speech</div>
-      </div>
-    </header>
 
-    <div class="main-grid">
-      <!-- Left: Session Config -->
-      <div class="card">
-        <div class="card-header">
-          <h2>Session Config (sessionStart)</h2>
-          <button class="btn btn-reset" onclick="resetSessionConfig()">Reset</button>
-        </div>
-        <div class="card-body">
-          <p class="section-label">Inference &amp; Turn Detection</p>
-          <textarea id="session-config" class="json-editor" spellcheck="false"></textarea>
-          <p class="config-note">maxTokens, topP, temperature, endpointingSensitivity (HIGH / MEDIUM / LOW)</p>
-        </div>
-      </div>
+  <!-- Top Bar -->
+  <div class="topbar">
+    <h1>Nova 2 Sonic Playground</h1>
+    <div class="topbar-right">
+      <span class="badge" id="badge-voice">voice: matthew</span>
+      <span class="badge" id="badge-sensitivity">sensitivity: MEDIUM</span>
+    </div>
+  </div>
 
-      <!-- Right: Prompt Config -->
-      <div class="card">
-        <div class="card-header">
-          <h2>Prompt Config (promptStart)</h2>
-          <button class="btn btn-reset" onclick="resetPromptConfig()">Reset</button>
-        </div>
-        <div class="card-body">
-          <p class="section-label">Audio Output &amp; Voice</p>
-          <textarea id="prompt-config" class="json-editor" spellcheck="false"></textarea>
-          <p class="config-note">voiceId: matthew, tiffany, amy, arjun, florian, lupe, carlos, ambre, lennart, beatrice, lorenzo, tina, carolina, leo, kiara, olivia</p>
-        </div>
+  <!-- Main -->
+  <div class="main">
+    <!-- Control Strip -->
+    <div class="control-strip">
+      <button class="btn-mic idle" id="btn-mic" title="Start / Stop">&#x25B6;</button>
+      <div class="status-pill">
+        <div class="dot" id="status-dot"></div>
+        <span id="status-text">Ready</span>
       </div>
-
-      <!-- Left: System Prompt -->
-      <div class="card">
-        <div class="card-header">
-          <h2>System Prompt</h2>
-          <button class="btn btn-reset" onclick="resetSystemPrompt()">Reset</button>
-        </div>
-        <div class="card-body">
-          <textarea id="system-prompt" class="prompt-editor" spellcheck="false"></textarea>
-          <div class="tool-section">
-            <input type="checkbox" id="chk-tools">
-            <label for="chk-tools">Tool use (天気取得) を有効にする</label>
-          </div>
-        </div>
+      <div class="prompt-preview" id="prompt-preview" onclick="openSettings()" title="クリックして設定を開く">
+        <span class="label">Prompt:</span><span id="prompt-preview-text"></span>
       </div>
+      <button class="btn-settings" onclick="openSettings()">Settings</button>
+    </div>
 
-      <!-- Right: Quick Reference -->
-      <div class="card">
-        <div class="card-header">
-          <h2>Quick Reference</h2>
+    <!-- Log -->
+    <div class="log-area" id="log"></div>
+
+    <!-- Text Input -->
+    <div class="input-bar">
+      <input type="text" id="text-input" placeholder="テキスト入力 (Enter送信) — Model-start-first等に使用" disabled>
+      <button id="btn-send" disabled onclick="sendText()">Send</button>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="overlay" id="overlay" onclick="closeSettings()"></div>
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-header">
+      <h2>Session Settings</h2>
+      <button class="close-btn" onclick="closeSettings()">&times;</button>
+    </div>
+    <div class="settings-body">
+
+      <!-- System Prompt -->
+      <div class="field">
+        <div class="field-label">
+          <span>System Prompt</span>
+          <button onclick="resetSystemPrompt()">Reset</button>
         </div>
-        <div class="card-body" style="font-size: 0.75rem; line-height: 1.8; color: var(--text-muted);">
-          <strong style="color: var(--text);">Verification Points:</strong><br>
-          1. 通常: AI から話しかけない<br>
-          2. Model-start-first: AI から先に話す<br>
-          3. voiceId 変更: 声質が変わる<br>
-          4. 言語変更: ポリグロットボイスで多言語<br>
-          5. ターンテイキング &amp; barge-in<br>
-          6. 抑揚/テンションが応答に影響<br>
-          7. Tool use で天気取得<br>
-          8. 発話スピードの制御<br>
-          <br>
-          <strong style="color: var(--text);">Cross-modal Text Input:</strong><br>
-          セッション中に下のテキスト入力でメッセージを送信可能（Model-start-first 等）
-        </div>
+        <textarea class="cfg prompt" id="system-prompt" spellcheck="false"></textarea>
       </div>
 
-      <!-- Control Bar -->
-      <div class="control-bar">
-        <button id="btn-start" class="btn-start idle">Start</button>
-        <div class="status-indicator">
-          <div class="status-dot" id="status-dot"></div>
-          <span id="status-text">Ready</span>
+      <!-- Voice & Sensitivity (quick access) -->
+      <div class="field">
+        <div class="field-label"><span>Voice &amp; Turn Detection</span></div>
+        <div class="quick-settings" style="border-top:none; margin-top:0; padding-top:0;">
+          <label>Voice:
+            <select id="sel-voice">
+              <option value="matthew">matthew (US/polyglot)</option>
+              <option value="tiffany">tiffany (US/polyglot)</option>
+              <option value="amy">amy (UK)</option>
+              <option value="olivia">olivia (AU)</option>
+              <option value="arjun">arjun (IN)</option>
+              <option value="kiara">kiara (IN)</option>
+              <option value="florian">florian (FR)</option>
+              <option value="ambre">ambre (FR)</option>
+              <option value="lennart">lennart (DE)</option>
+              <option value="tina">tina (DE)</option>
+              <option value="lupe">lupe (ES)</option>
+              <option value="carlos">carlos (ES)</option>
+              <option value="beatrice">beatrice (IT)</option>
+              <option value="lorenzo">lorenzo (IT)</option>
+              <option value="carolina">carolina (PT)</option>
+              <option value="leo">leo (PT)</option>
+            </select>
+          </label>
+          <label>Sensitivity:
+            <select id="sel-sensitivity">
+              <option value="LOW">LOW</option>
+              <option value="MEDIUM" selected>MEDIUM</option>
+              <option value="HIGH">HIGH</option>
+            </select>
+          </label>
         </div>
-        <div class="text-inject-bar">
-          <input type="text" id="text-input" placeholder="Cross-modal text input (Enter で送信)" disabled>
-          <button class="btn btn-accent" id="btn-send" disabled onclick="sendTextInput()">Send</button>
+        <p class="field-note">Voice / Sensitivity はセッション開始時に適用されます（途中変更不可）</p>
+      </div>
+
+      <!-- Tool use -->
+      <div class="field">
+        <div class="toggle-row">
+          <input type="checkbox" id="chk-tools">
+          <label for="chk-tools">Tool use を有効にする (天気取得)</label>
         </div>
       </div>
 
-      <!-- Log Panel -->
-      <div class="card log-panel">
-        <div class="card-header">
-          <h2>Log</h2>
-          <button class="btn btn-reset" onclick="clearLog()">Clear</button>
+      <!-- Advanced: Session Config -->
+      <div class="field">
+        <div class="field-label">
+          <span>Session Config (Advanced)</span>
+          <button onclick="resetSessionConfig()">Reset</button>
         </div>
-        <div class="card-body" style="padding: 0;">
-          <div class="log" id="log"></div>
-        </div>
+        <textarea class="cfg json" id="session-config" spellcheck="false"></textarea>
+        <p class="field-note">inferenceConfiguration: maxTokens, topP, temperature</p>
       </div>
+
+      <!-- Advanced: Prompt Config -->
+      <div class="field">
+        <div class="field-label">
+          <span>Prompt Config (Advanced)</span>
+          <button onclick="resetPromptConfig()">Reset</button>
+        </div>
+        <textarea class="cfg json" id="prompt-config" spellcheck="false"></textarea>
+        <p class="field-note">audioOutputConfiguration: voiceId, sampleRateHertz (8000/16000/24000)</p>
+      </div>
+
     </div>
   </div>
 
   <script>
-    // ─── Default Configs ─────────────────────────────
-    const DEFAULT_SESSION_CONFIG = {
-      inferenceConfiguration: {
-        maxTokens: 1024,
-        topP: 0.9,
-        temperature: 0.7
-      },
-      turnDetectionConfiguration: {
-        endpointingSensitivity: "MEDIUM"
-      }
-    };
-
-    const DEFAULT_PROMPT_CONFIG = {
+  // ─── Defaults ───────────────────────────────────
+  const DEFAULTS = {
+    systemPrompt: "You are a friendly English conversation partner. Keep responses short (1-2 sentences). Respond in the same language as the user.",
+    sessionConfig: {
+      inferenceConfiguration: { maxTokens: 1024, topP: 0.9, temperature: 0.7 }
+    },
+    promptConfig: {
       audioOutputConfiguration: {
         mediaType: "audio/lpcm",
         sampleRateHertz: 24000,
@@ -370,245 +454,194 @@
         encoding: "base64",
         audioType: "SPEECH"
       },
-      textOutputConfiguration: {
-        mediaType: "text/plain"
-      }
-    };
-
-    const DEFAULT_SYSTEM_PROMPT = "You are a friendly English conversation partner. Keep responses short (1-2 sentences). Respond in the same language as the user.";
-
-    // ─── DOM Elements ────────────────────────────────
-    const sessionConfigEl = document.getElementById('session-config');
-    const promptConfigEl = document.getElementById('prompt-config');
-    const systemPromptEl = document.getElementById('system-prompt');
-    const btnStart = document.getElementById('btn-start');
-    const statusDot = document.getElementById('status-dot');
-    const statusText = document.getElementById('status-text');
-    const logEl = document.getElementById('log');
-    const textInput = document.getElementById('text-input');
-    const btnSend = document.getElementById('btn-send');
-    const chkTools = document.getElementById('chk-tools');
-
-    // ─── State ───────────────────────────────────────
-    let ws = null;
-    let audioContext = null;
-    let mediaStream = null;
-    let scriptProcessor = null;
-    let isStreaming = false;
-    let playbackCtx = null;
-    let nextPlayTime = 0;
-
-    // ─── Init ────────────────────────────────────────
-    resetSessionConfig();
-    resetPromptConfig();
-    resetSystemPrompt();
-
-    btnStart.addEventListener('click', () => {
-      if (isStreaming) stopSession();
-      else startSession();
-    });
-
-    textInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendTextInput();
-      }
-    });
-
-    // ─── Reset Functions ─────────────────────────────
-    function resetSessionConfig() {
-      sessionConfigEl.value = JSON.stringify(DEFAULT_SESSION_CONFIG, null, 2);
-      sessionConfigEl.classList.remove('error');
+      textOutputConfiguration: { mediaType: "text/plain" }
     }
-    function resetPromptConfig() {
-      promptConfigEl.value = JSON.stringify(DEFAULT_PROMPT_CONFIG, null, 2);
-      promptConfigEl.classList.remove('error');
-    }
-    function resetSystemPrompt() {
-      systemPromptEl.value = DEFAULT_SYSTEM_PROMPT;
-    }
+  };
 
-    // ─── JSON Validation ─────────────────────────────
-    function parseConfig(el) {
-      try {
-        const obj = JSON.parse(el.value);
-        el.classList.remove('error');
-        return obj;
-      } catch (e) {
-        el.classList.add('error');
-        return null;
-      }
-    }
+  // ─── Elements ───────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const btnMic = $('btn-mic');
+  const statusDot = $('status-dot');
+  const statusText = $('status-text');
+  const logEl = $('log');
+  const textInput = $('text-input');
+  const btnSend = $('btn-send');
+  const systemPromptEl = $('system-prompt');
+  const sessionConfigEl = $('session-config');
+  const promptConfigEl = $('prompt-config');
+  const selVoice = $('sel-voice');
+  const selSensitivity = $('sel-sensitivity');
+  const chkTools = $('chk-tools');
+  const overlay = $('overlay');
+  const settingsPanel = $('settings-panel');
+  const badgeVoice = $('badge-voice');
+  const badgeSensitivity = $('badge-sensitivity');
+  const promptPreviewText = $('prompt-preview-text');
 
-    // ─── Session Management ──────────────────────────
-    async function startSession() {
-      const sessionConfig = parseConfig(sessionConfigEl);
-      const promptConfig = parseConfig(promptConfigEl);
-      if (!sessionConfig || !promptConfig) {
-        addLog('system', 'JSON parse error — config を確認してください');
-        return;
-      }
+  // ─── State ──────────────────────────────────────
+  let ws = null, audioCtx = null, mediaStream = null, processor = null;
+  let playCtx = null, nextPlayTime = 0, isStreaming = false;
 
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
-        });
-        audioContext = new AudioContext({ sampleRate: 16000 });
-        const source = audioContext.createMediaStreamSource(mediaStream);
-        scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
-        source.connect(scriptProcessor);
-        scriptProcessor.connect(audioContext.destination);
+  // ─── Init ───────────────────────────────────────
+  resetSystemPrompt();
+  resetSessionConfig();
+  resetPromptConfig();
+  updateBadges();
+  updatePromptPreview();
 
-        ws = new WebSocket('ws://127.0.0.1:8765');
+  systemPromptEl.addEventListener('input', updatePromptPreview);
+  selVoice.addEventListener('change', () => { syncVoiceToConfig(); updateBadges(); });
+  selSensitivity.addEventListener('change', updateBadges);
 
-        ws.onopen = () => {
-          const config = {
-            sessionConfig: sessionConfig,
-            promptConfig: promptConfig,
-            systemPrompt: systemPromptEl.value,
-            enableTools: chkTools.checked,
-          };
-          ws.send(JSON.stringify({ type: 'start', config }));
-          isStreaming = true;
-          setUIState('active');
+  btnMic.addEventListener('click', () => isStreaming ? stop() : start());
+  textInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendText(); } });
 
-          const voiceId = promptConfig.audioOutputConfiguration?.voiceId || 'matthew';
-          const sensitivity = sessionConfig.turnDetectionConfiguration?.endpointingSensitivity || 'MEDIUM';
-          addLog('system', `Session started (voice: ${voiceId}, sensitivity: ${sensitivity})`);
+  // ─── Settings Panel ─────────────────────────────
+  function openSettings() { overlay.classList.add('open'); settingsPanel.classList.add('open'); }
+  function closeSettings() { overlay.classList.remove('open'); settingsPanel.classList.remove('open'); updateBadges(); updatePromptPreview(); }
 
-          scriptProcessor.onaudioprocess = (e) => {
-            if (!isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
-            const float32 = e.inputBuffer.getChannelData(0);
-            const int16 = new Int16Array(float32.length);
-            for (let i = 0; i < float32.length; i++) {
-              const s = Math.max(-1, Math.min(1, float32[i]));
-              int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-            }
-            ws.send(JSON.stringify({ type: 'audio', data: arrayBufferToBase64(int16.buffer) }));
-          };
+  // ─── Reset Functions ────────────────────────────
+  function resetSystemPrompt() { systemPromptEl.value = DEFAULTS.systemPrompt; updatePromptPreview(); }
+  function resetSessionConfig() { sessionConfigEl.value = JSON.stringify(DEFAULTS.sessionConfig, null, 2); }
+  function resetPromptConfig() {
+    promptConfigEl.value = JSON.stringify(DEFAULTS.promptConfig, null, 2);
+    selVoice.value = 'matthew';
+    updateBadges();
+  }
+
+  // ─── Sync voice select → JSON ──────────────────
+  function syncVoiceToConfig() {
+    try {
+      const cfg = JSON.parse(promptConfigEl.value);
+      cfg.audioOutputConfiguration.voiceId = selVoice.value;
+      promptConfigEl.value = JSON.stringify(cfg, null, 2);
+    } catch(e) {}
+  }
+
+  // ─── UI Updates ─────────────────────────────────
+  function updateBadges() {
+    badgeVoice.textContent = `voice: ${selVoice.value}`;
+    badgeSensitivity.textContent = `sensitivity: ${selSensitivity.value}`;
+  }
+  function updatePromptPreview() {
+    const text = systemPromptEl.value.replace(/\n/g, ' ');
+    promptPreviewText.textContent = text || '(empty)';
+  }
+
+  // ─── Session ────────────────────────────────────
+  async function start() {
+    // Parse configs
+    let sessionConfig, promptConfig;
+    try { sessionConfig = JSON.parse(sessionConfigEl.value); } catch(e) { addLog('system','Session Config JSON error'); openSettings(); return; }
+    try { promptConfig = JSON.parse(promptConfigEl.value); } catch(e) { addLog('system','Prompt Config JSON error'); openSettings(); return; }
+
+    // Add sensitivity to session config
+    sessionConfig.turnDetectionConfiguration = { endpointingSensitivity: selSensitivity.value };
+
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate:16000, channelCount:1, echoCancellation:true, noiseSuppression:true } });
+      audioCtx = new AudioContext({ sampleRate: 16000 });
+      const src = audioCtx.createMediaStreamSource(mediaStream);
+      processor = audioCtx.createScriptProcessor(2048, 1, 1);
+      src.connect(processor);
+      processor.connect(audioCtx.destination);
+
+      ws = new WebSocket('ws://127.0.0.1:8765');
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'start', config: { sessionConfig, promptConfig, systemPrompt: systemPromptEl.value, enableTools: chkTools.checked } }));
+        isStreaming = true;
+        setUI('active');
+        addLog('system', `Started — ${selVoice.value} / ${selSensitivity.value}`);
+
+        processor.onaudioprocess = e => {
+          if (!isStreaming || !ws || ws.readyState !== 1) return;
+          const f = e.inputBuffer.getChannelData(0);
+          const i16 = new Int16Array(f.length);
+          for (let i=0;i<f.length;i++) { const s=Math.max(-1,Math.min(1,f[i])); i16[i]=s<0?s*0x8000:s*0x7FFF; }
+          ws.send(JSON.stringify({ type:'audio', data: bufToB64(i16.buffer) }));
         };
+      };
+      ws.onmessage = e => handleMsg(JSON.parse(e.data));
+      ws.onclose = () => { if(isStreaming) stop(); };
+      ws.onerror = () => { addLog('system','Connection error — server.py is running?'); stop(); };
+    } catch(err) { addLog('system', 'Error: ' + err.message); }
+  }
 
-        ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
-        ws.onclose = () => { if (isStreaming) stopSession(); };
-        ws.onerror = () => {
-          addLog('system', 'WebSocket error — server.py が起動しているか確認');
-          stopSession();
-        };
+  function stop() {
+    if (ws && ws.readyState === 1) { ws.send(JSON.stringify({type:'stop'})); ws.close(); }
+    ws = null; isStreaming = false;
+    if (processor) { processor.disconnect(); processor = null; }
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    if (mediaStream) { mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; }
+    setUI('idle');
+    addLog('system', 'Stopped');
+  }
 
-      } catch (err) {
-        addLog('system', 'Error: ' + err.message);
-      }
+  function sendText() {
+    const t = textInput.value.trim();
+    if (!t || !isStreaming || !ws) return;
+    ws.send(JSON.stringify({ type:'textInject', content: t }));
+    addLog('user', t);
+    textInput.value = '';
+  }
+
+  function setUI(state) {
+    if (state === 'active') {
+      btnMic.className = 'btn-mic active';
+      btnMic.innerHTML = '&#x25A0;';
+      statusDot.classList.add('on');
+      statusText.textContent = 'Streaming';
+      textInput.disabled = false;
+      btnSend.disabled = false;
+    } else {
+      btnMic.className = 'btn-mic idle';
+      btnMic.innerHTML = '&#x25B6;';
+      statusDot.classList.remove('on');
+      statusText.textContent = 'Ready';
+      textInput.disabled = true;
+      btnSend.disabled = true;
     }
+  }
 
-    function stopSession() {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'stop' }));
-        ws.close();
-      }
-      ws = null;
-      isStreaming = false;
-      if (scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
-      if (audioContext) { audioContext.close(); audioContext = null; }
-      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-      setUIState('idle');
-      addLog('system', 'Session ended');
+  // ─── Message Handler ────────────────────────────
+  function handleMsg(msg) {
+    switch(msg.type) {
+      case 'transcript': addLog(msg.role==='USER'?'user':'assistant', msg.content); break;
+      case 'audio': playAudio(msg.data); break;
+      case 'toolCall': addLog('tool', `Tool: ${msg.toolName}(${msg.params})`); break;
+      case 'state': if(msg.state==='ended') addLog('system','Session ended (timeout or error)'); break;
+      case 'error': addLog('system', msg.message); break;
     }
+  }
 
-    function sendTextInput() {
-      const text = textInput.value.trim();
-      if (!text || !isStreaming || !ws) return;
-      ws.send(JSON.stringify({ type: 'textInject', content: text }));
-      addLog('user', `[text] ${text}`);
-      textInput.value = '';
-    }
+  // ─── Audio Playback ─────────────────────────────
+  function playAudio(b64) {
+    if (!playCtx) { playCtx = new AudioContext({sampleRate:24000}); nextPlayTime = playCtx.currentTime; }
+    const i16 = new Int16Array(b64ToArr(b64));
+    const f32 = new Float32Array(i16.length);
+    for (let i=0;i<i16.length;i++) f32[i] = i16[i]/32768.0;
+    const buf = playCtx.createBuffer(1, f32.length, 24000);
+    buf.getChannelData(0).set(f32);
+    const s = playCtx.createBufferSource();
+    s.buffer = buf; s.connect(playCtx.destination);
+    const now = playCtx.currentTime;
+    if (nextPlayTime < now) nextPlayTime = now;
+    s.start(nextPlayTime);
+    nextPlayTime += buf.duration;
+  }
 
-    // ─── UI State ────────────────────────────────────
-    function setUIState(state) {
-      if (state === 'active') {
-        btnStart.textContent = 'Stop';
-        btnStart.className = 'btn-start active';
-        statusDot.classList.add('active');
-        statusText.textContent = 'Streaming';
-        textInput.disabled = false;
-        btnSend.disabled = false;
-      } else {
-        btnStart.textContent = 'Start';
-        btnStart.className = 'btn-start idle';
-        statusDot.classList.remove('active');
-        statusText.textContent = 'Ready';
-        textInput.disabled = true;
-        btnSend.disabled = true;
-      }
-    }
+  // ─── Log ────────────────────────────────────────
+  function addLog(type, text) {
+    const d = document.createElement('div');
+    d.className = `log-entry log-${type}`;
+    d.textContent = text;
+    logEl.appendChild(d);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
 
-    // ─── Message Handler ─────────────────────────────
-    function handleMessage(msg) {
-      switch (msg.type) {
-        case 'transcript':
-          addLog(msg.role === 'USER' ? 'user' : 'assistant', msg.content);
-          break;
-        case 'audio':
-          playAudio(msg.data);
-          break;
-        case 'toolCall':
-          addLog('tool', `Tool: ${msg.toolName}(${msg.params})`);
-          break;
-        case 'state':
-          if (msg.state === 'ended') addLog('system', 'Bedrock session ended');
-          break;
-        case 'error':
-          addLog('system', 'Error: ' + msg.message);
-          break;
-      }
-    }
-
-    // ─── Audio Playback ──────────────────────────────
-    function playAudio(base64Data) {
-      if (!playbackCtx) {
-        playbackCtx = new AudioContext({ sampleRate: 24000 });
-        nextPlayTime = playbackCtx.currentTime;
-      }
-      const bytes = base64ToArrayBuffer(base64Data);
-      const int16 = new Int16Array(bytes);
-      const float32 = new Float32Array(int16.length);
-      for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768.0;
-
-      const buffer = playbackCtx.createBuffer(1, float32.length, 24000);
-      buffer.getChannelData(0).set(float32);
-      const src = playbackCtx.createBufferSource();
-      src.buffer = buffer;
-      src.connect(playbackCtx.destination);
-
-      const now = playbackCtx.currentTime;
-      if (nextPlayTime < now) nextPlayTime = now;
-      src.start(nextPlayTime);
-      nextPlayTime += buffer.duration;
-    }
-
-    // ─── Log ─────────────────────────────────────────
-    function addLog(type, text) {
-      const div = document.createElement('div');
-      div.className = `log-entry log-${type}`;
-      const prefixes = { user: 'You: ', assistant: 'AI: ', tool: '', system: '' };
-      div.textContent = (prefixes[type] || '') + text;
-      logEl.appendChild(div);
-      logEl.scrollTop = logEl.scrollHeight;
-    }
-    function clearLog() { logEl.innerHTML = ''; }
-
-    // ─── Utilities ───────────────────────────────────
-    function arrayBufferToBase64(buf) {
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      return btoa(binary);
-    }
-    function base64ToArrayBuffer(b64) {
-      const binary = atob(b64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return bytes.buffer;
-    }
+  // ─── Utils ──────────────────────────────────────
+  function bufToB64(buf) { const b=new Uint8Array(buf); let s=''; for(let i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s); }
+  function b64ToArr(b64) { const s=atob(b64); const b=new Uint8Array(s.length); for(let i=0;i<s.length;i++) b[i]=s.charCodeAt(i); return b.buffer; }
   </script>
 </body>
 </html>
