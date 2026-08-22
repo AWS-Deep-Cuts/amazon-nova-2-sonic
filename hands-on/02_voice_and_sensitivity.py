@@ -21,7 +21,7 @@ import sys
 
 import boto3
 
-REGION = os.environ.get("AWS_REGION", "us-east-1")
+REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
 MODEL_ID = "amazon.nova-2-sonic-v1:0"
 OUTPUT_DIR = "output"
 
@@ -319,3 +319,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    # results.html を生成（ブラウザで WAV 再生可能）
+    from generate_results import generate_results_html
+    html_path = generate_results_html()
+    print(f"  📄 結果ページを生成しました: {html_path}")
+    print(f"     ダウンロードしてブラウザで開くと音声を再生できます。")

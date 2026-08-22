@@ -11,11 +11,12 @@ Amazon-Nova-2-Sonic/
 ├── README.md
 ├── article.md
 └── hands-on/
-    ├── setup.sh                       # セットアップ (pip install + モデルアクセス確認)
+    ├── setup.sh                       # セットアップ (モデルアクセス確認のみ)
     ├── 01_basic_conversation.py       # 基本の双方向ストリーミング
     ├── 02_voice_and_sensitivity.py    # voiceId・感度の切り替え
     ├── 03_cross_modal_and_tools.py    # Cross-modal input + Tool use
     ├── 04_realtime_microphone.py      # マイク入力のリアルタイム会話 (ローカル用)
+    ├── generate_results.py            # 結果 HTML 生成 (各スクリプトが自動呼び出し)
     └── cleanup.sh                     # 出力ファイル削除
 ```
 

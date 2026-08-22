@@ -156,15 +156,16 @@ bash setup.sh
 リージョンを変更する場合は環境変数を設定してから実行してください。
 
 ```bash
-export AWS_REGION=ap-northeast-1
+export AWS_REGION=us-east-1
 bash setup.sh
 ```
 
-setup.sh が行うことは以下の 3 ステップです。
+setup.sh が行うことは以下の 2 ステップです。
 
 1. AWS 認証の確認 (`aws sts get-caller-identity`)
-2. Python パッケージのインストール (`pip install boto3`)
-3. Bedrock モデルアクセスの確認 (`aws bedrock get-foundation-model`)
+2. Bedrock モデルアクセスの確認 (`aws bedrock get-foundation-model`)
+
+追加のパッケージインストールは不要です（boto3 は CloudShell にプリインストールされています）。
 
 正常に完了すると次のような出力が表示されます。
 
@@ -173,21 +174,18 @@ setup.sh が行うことは以下の 3 ステップです。
   AWS Deep Cuts - Amazon Nova 2 Sonic セットアップ
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-リージョン: us-east-1
+リージョン: ap-northeast-1
 モデル:     amazon.nova-2-sonic-v1:0
 
-Step 1/3: AWS 認証を確認
+Step 1/2: AWS 認証を確認
   Account: 123456789012
 
-Step 2/3: Python 依存パッケージをインストール
-  boto3: OK
-  pyaudio: 未インストール (Step 4 のマイク入力は使えません — CloudShell では正常)
-
-Step 3/3: Bedrock モデルアクセスを確認
+Step 2/2: Bedrock モデルアクセスを確認
   amazon.nova-2-sonic-v1:0: アクセス可能
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  セットアップ完了
+  セットアップ完了 (追加インストールなし)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -205,7 +203,7 @@ python3 01_basic_conversation.py
 4. Cross-modal text input でテキストを注入し、AI に話しかける
 5. AI の音声応答を `output/step1_response.wav` に保存する
 
-実行すると AI の応答テキストがコンソールに表示され、音声が WAV ファイルに書き出されます。WAV ファイルは CloudShell からダウンロードして再生できます。
+実行すると AI の応答テキストがコンソールに表示され、音声が WAV ファイルに書き出されます。同時に `output/results.html` が生成されるので、ダウンロードしてブラウザで開くと音声再生とトランスクリプト確認を GUI で行えます。
 
 **学習ポイント**:
 
@@ -225,7 +223,7 @@ python3 02_voice_and_sensitivity.py
 2. `matthew` (ポリグロット) に英語・フランス語・スペイン語で話しかけ、言語切り替えを確認する
 3. `endpointingSensitivity` (HIGH / MEDIUM / LOW) の動作を解説する
 
-`output/` ディレクトリに複数の WAV ファイルが出力されます。ダウンロードして聴き比べてください。
+`output/` ディレクトリに複数の WAV ファイルが出力されます。`output/results.html` をダウンロードしてブラウザで開くと、全音声を聴き比べられます。
 
 **学習ポイント**:
 

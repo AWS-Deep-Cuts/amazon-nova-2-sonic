@@ -41,7 +41,7 @@ try:
 except ImportError:
     HAS_PYAUDIO = False
 
-REGION = os.environ.get("AWS_REGION", "us-east-1")
+REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
 MODEL_ID = "amazon.nova-2-sonic-v1:0"
 
 # オーディオ設定
