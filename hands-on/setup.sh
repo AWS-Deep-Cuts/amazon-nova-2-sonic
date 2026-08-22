@@ -1,29 +1,39 @@
 #!/bin/bash
 
-# AWS Deep Cuts - Amazon Nova 2 Sonic セットアップ
+# AWS Deep Cuts - Amazon Nova 2 Sonic セットアップ + ハンズオン実行
 # CloudShell で実行してください。追加インストールは不要です。
+#
+# このスクリプトは以下を行います:
+#   1. AWS 認証確認
+#   2. Bedrock モデルアクセス確認
+#   3. Step 1〜3 の Python スクリプトを順番に実行
+#   4. 結果 HTML を生成
+#
+# 完了後、output/results.html をダウンロードしてブラウザで開くと
+# 音声再生・トランスクリプト・学習ポイントを確認できます。
 
 set -euo pipefail
 
 AWS_REGION="${AWS_REGION:-ap-northeast-1}"
 MODEL_ID="amazon.nova-2-sonic-v1:0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  AWS Deep Cuts - Amazon Nova 2 Sonic セットアップ"
+echo "  AWS Deep Cuts - Amazon Nova 2 Sonic"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "リージョン: ${AWS_REGION}"
 echo "モデル:     ${MODEL_ID}"
 echo ""
 
-# Step 1: AWS 認証確認
-echo "Step 1/2: AWS 認証を確認"
+# ─── Step 0: AWS 認証確認 ─────────────────────────────────────
+echo "Step 0/5: AWS 認証を確認"
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 echo "  Account: ${ACCOUNT_ID}"
 echo ""
 
-# Step 2: Bedrock モデルアクセス確認
-echo "Step 2/2: Bedrock モデルアクセスを確認"
+# ─── Step 1: Bedrock モデルアクセス確認 ───────────────────────
+echo "Step 1/5: Bedrock モデルアクセスを確認"
 MODEL_CHECK=$(aws bedrock get-foundation-model \
   --model-identifier "${MODEL_ID}" \
   --region "${AWS_REGION}" \
@@ -48,23 +58,43 @@ else
 fi
 echo ""
 
+# ─── Step 2: 基本の双方向ストリーミング ───────────────────────
+echo "Step 2/5: 基本の双方向ストリーミング (01_basic_conversation.py)"
+echo ""
+cd "${SCRIPT_DIR}"
+python3 01_basic_conversation.py
+echo ""
+
+# ─── Step 3: voiceId と感度の切り替え ─────────────────────────
+echo "Step 3/5: voiceId と感度の切り替え (02_voice_and_sensitivity.py)"
+echo ""
+python3 02_voice_and_sensitivity.py
+echo ""
+
+# ─── Step 4: Cross-modal input + Tool use ─────────────────────
+echo "Step 4/5: Cross-modal input + Tool use (03_cross_modal_and_tools.py)"
+echo ""
+python3 03_cross_modal_and_tools.py
+echo ""
+
+# ─── Step 5: 結果ページ生成 ───────────────────────────────────
+echo "Step 5/5: 結果ページを生成"
+python3 generate_results.py
+echo ""
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  セットアップ完了 (追加インストールなし)"
+echo "  ハンズオン完了"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "ハンズオンを以下の順番で実行してください:"
+echo "結果を確認するには output/results.html をダウンロードして"
+echo "ブラウザで開いてください。"
 echo ""
-echo "  Step 1: 基本の双方向ストリーミング (テキスト入力 → 音声出力)"
-echo "    python3 01_basic_conversation.py"
+echo "  CloudShell の場合:"
+echo "    Actions → Download file → パスに以下を入力:"
+echo "    $(pwd)/output/results.html"
 echo ""
-echo "  Step 2: voiceId・感度の切り替え体験"
-echo "    python3 02_voice_and_sensitivity.py"
+echo "音声ファイル (WAV) もブラウザ上で再生できます。"
 echo ""
-echo "  Step 3: Cross-modal text input + Tool use"
-echo "    python3 03_cross_modal_and_tools.py"
-echo ""
-echo "各スクリプトの実行後、output/ ディレクトリに WAV ファイルと"
-echo "results.html が生成されます。"
-echo "results.html をダウンロードしてブラウザで開くと、音声再生と"
-echo "学習ポイントを GUI で確認できます。"
+echo "クリーンアップ:"
+echo "  bash cleanup.sh"
 echo ""

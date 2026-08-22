@@ -23,13 +23,12 @@ Amazon-Nova-2-Sonic/
 ## ハンズオンの流れ
 
 1. [article.md](./article.md) を読み、Nova 2 Sonic の概要・アーキテクチャ・制約を確認する
-2. CloudShell を開き、リポジトリを clone する
-3. `hands-on/setup.sh` でセットアップを実行する
-4. `01_basic_conversation.py` で双方向ストリーミングの基本動作を確認する
-5. `02_voice_and_sensitivity.py` で voiceId とターン検出感度の違いを体験する
-6. `03_cross_modal_and_tools.py` でテキスト注入と Tool use を観察する
-7. (ローカル PC のみ) `04_realtime_microphone.py` でマイクを使ったリアルタイム会話を体験する
-8. `hands-on/cleanup.sh` で出力ファイルを削除する
+2. Bedrock コンソールで `amazon.nova-2-sonic-v1:0` のモデルアクセスを有効化する
+3. CloudShell を開き、リポジトリを clone する
+4. `hands-on/setup.sh` を実行する（認証確認 → ハンズオン実行 → 結果HTML生成まで自動）
+5. スクリプトが出力したパスに従い `output/results.html` をダウンロードしてブラウザで開く
+6. ブラウザ上で音声再生・トランスクリプト・学習ポイントを確認する
+7. 確認後、`hands-on/cleanup.sh` で出力ファイルを削除する
 
 ## 注意事項
 

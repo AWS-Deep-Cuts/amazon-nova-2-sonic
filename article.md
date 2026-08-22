@@ -143,7 +143,7 @@ Step 4 (04_realtime_microphone.py) ※ ローカル PC のみ
 
 # 4. ハンズオン
 
-## 4.1 セットアップ
+## 4.1 セットアップと実行
 
 CloudShell を開き、以下を実行します。
 
@@ -160,42 +160,34 @@ export AWS_REGION=us-east-1
 bash setup.sh
 ```
 
-setup.sh が行うことは以下の 2 ステップです。
+setup.sh は以下を順番に実行します。
 
-1. AWS 認証の確認 (`aws sts get-caller-identity`)
-2. Bedrock モデルアクセスの確認 (`aws bedrock get-foundation-model`)
+1. AWS 認証の確認
+2. Bedrock モデルアクセスの確認
+3. Step 1: 基本の双方向ストリーミング (`01_basic_conversation.py`)
+4. Step 2: voiceId と感度の切り替え (`02_voice_and_sensitivity.py`)
+5. Step 3: Cross-modal input + Tool use (`03_cross_modal_and_tools.py`)
+6. 結果 HTML の生成 (`generate_results.py`)
 
 追加のパッケージインストールは不要です（boto3 は CloudShell にプリインストールされています）。
 
-正常に完了すると次のような出力が表示されます。
-
-```text
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  AWS Deep Cuts - Amazon Nova 2 Sonic セットアップ
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-リージョン: ap-northeast-1
-モデル:     amazon.nova-2-sonic-v1:0
-
-Step 1/2: AWS 認証を確認
-  Account: 123456789012
-
-Step 2/2: Bedrock モデルアクセスを確認
-  amazon.nova-2-sonic-v1:0: アクセス可能
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  セットアップ完了 (追加インストールなし)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+完了すると `output/results.html` のパスが表示されます。CloudShell の場合は Actions → Download file でこのパスを指定してダウンロードし、ブラウザで開いてください。
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-## 4.2 Step 1: 基本の双方向ストリーミング
+## 4.2 結果をブラウザで確認する
 
-```bash
-python3 01_basic_conversation.py
-```
+`output/results.html` をブラウザで開くと、以下を確認できます。
 
-このスクリプトは以下を行います。
+- **音声再生**: 各 Step で生成された WAV ファイルをブラウザ上で再生
+- **トランスクリプト**: AI の応答テキスト
+- **学習ポイント**: Nova 2 Sonic の主要特性まとめ
+
+## 4.3 各 Step の解説
+
+### Step 1: 基本の双方向ストリーミング
+
+`01_basic_conversation.py` は以下を行います。
 
 1. Nova 2 Sonic にセッションを開始する
 2. システムプロンプトで AI のペルソナを設定する
@@ -203,7 +195,7 @@ python3 01_basic_conversation.py
 4. Cross-modal text input でテキストを注入し、AI に話しかける
 5. AI の音声応答を `output/step1_response.wav` に保存する
 
-実行すると AI の応答テキストがコンソールに表示され、音声が WAV ファイルに書き出されます。同時に `output/results.html` が生成されるので、ダウンロードしてブラウザで開くと音声再生とトランスクリプト確認を GUI で行えます。
+実行すると AI の応答テキストがコンソールに表示され、音声が WAV ファイルに書き出されます。
 
 **学習ポイント**:
 
@@ -211,13 +203,9 @@ python3 01_basic_conversation.py
 - サイレンスポンプ: 55 秒間音声入力がないとタイムアウトします。無音データ (ゼロ埋め PCM) を定期送信して接続を維持します。
 - Cross-modal text input: 音声ストリームを維持したまま、テキストを注入して AI に音声で応答させることができます。
 
-## 4.3 Step 2: voiceId と感度の切り替え
+### Step 2: voiceId と感度の切り替え
 
-```bash
-python3 02_voice_and_sensitivity.py
-```
-
-このスクリプトは以下を行います。
+`02_voice_and_sensitivity.py` は以下を行います。
 
 1. 同じ質問を `matthew` / `tiffany` / `amy` の 3 種類の声で応答させ、WAV を保存する
 2. `matthew` (ポリグロット) に英語・フランス語・スペイン語で話しかけ、言語切り替えを確認する
@@ -231,13 +219,9 @@ python3 02_voice_and_sensitivity.py
 - ポリグロットボイス (matthew, tiffany) は voiceId を変えずに言語を切り替えられます。
 - `endpointingSensitivity` はマイク入力時に効果を発揮します。LOW は初心者向け（長い沈黙を待つ）、HIGH は上級者向け（素早く応答）です。
 
-## 4.4 Step 3: Cross-modal input + Tool use
+### Step 3: Cross-modal input + Tool use
 
-```bash
-python3 03_cross_modal_and_tools.py
-```
-
-このスクリプトは以下を行います。
+`03_cross_modal_and_tools.py` は以下を行います。
 
 1. 3 ターンの模擬会話（意図的に文法ミスを含む英語）をテキスト注入で送信する
 2. AI が `evaluate_english` ツールを呼び出すかを観察する
@@ -251,7 +235,7 @@ python3 03_cross_modal_and_tools.py
 - `toolChoice` の選択肢: `auto` (モデル判断)、`any` (必ずいずれか)、`tool` (特定ツール強制)
 - Nova 2 Sonic のツールコールは非同期で、実行中も会話が継続できます。
 
-## 4.5 Step 4: マイク入力リアルタイム会話 (ローカル PC)
+## 4.4 Step 4: マイク入力リアルタイム会話 (ローカル PC)
 
 このステップは CloudShell では実行できません。マイクとスピーカーが必要です。
 
