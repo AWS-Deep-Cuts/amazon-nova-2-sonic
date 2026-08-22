@@ -5,137 +5,451 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AWS Deep Cuts: Nova 2 Sonic Playground</title>
   <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface-alt: #1e2a3a;
+      --border: #2d3f52;
+      --text: #e8edf2;
+      --text-muted: #8899aa;
+      --accent: #ff9900;
+      --accent-dim: #cc7a00;
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --purple: #a78bfa;
+      --radius: 8px;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f6f8; color: #1f2937; padding: 20px; }
-    .container { max-width: 780px; margin: 0 auto; }
-    header { background: #232f3e; color: #fff; padding: 18px 20px; border-radius: 8px 8px 0 0; }
-    header h1 { font-size: 1.1rem; }
-    header p { font-size: 0.75rem; color: #adb5bd; margin-top: 4px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
 
-    .panel { background: #fff; border: 1px solid #dbe4ee; border-top: none; padding: 16px 20px; }
-    .panel:last-of-type { border-radius: 0 0 8px 8px; }
+    .container { max-width: 1100px; margin: 0 auto; }
 
-    /* 設定 */
-    .settings { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-    .settings label { font-size: 0.7rem; color: #6b7280; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
-    .settings select { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.8rem; }
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    header .logo {
+      background: var(--accent);
+      color: #000;
+      width: 40px; height: 40px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1.1rem;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 600; }
+    header .subtitle { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
 
-    /* プロンプト */
-    .prompt-section { margin-top: 12px; }
-    .prompt-section label { font-size: 0.7rem; color: #6b7280; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
-    textarea { width: 100%; height: 90px; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.8rem; font-family: inherit; resize: vertical; line-height: 1.5; }
+    /* Layout */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
 
-    /* ツール */
-    .tool-toggle { margin-top: 10px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; }
-    .tool-toggle input { width: 16px; height: 16px; }
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-alt);
+    }
+    .card-header h2 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .card-body { padding: 14px; }
 
-    /* コントロール */
-    .controls { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
-    button { padding: 8px 16px; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    #btn-mic { background: #dc2626; color: #fff; min-width: 140px; }
-    #btn-mic.off { background: #16a34a; }
-    #btn-mic.off::before { content: "🎤 Start"; }
-    #btn-mic:not(.off)::before { content: "⏹ Stop"; }
-    .status { font-size: 0.75rem; color: #6b7280; }
-    .status.active { color: #16a34a; font-weight: 600; }
+    /* JSON Editor */
+    .json-editor {
+      width: 100%;
+      min-height: 180px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      line-height: 1.6;
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+      tab-size: 2;
+    }
+    .json-editor:focus { border-color: var(--accent); }
+    .json-editor.error { border-color: var(--red); }
 
-    /* ログ */
-    .log { height: 260px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; padding: 10px; margin-top: 12px; background: #fafbfc; font-size: 0.78rem; line-height: 1.6; }
-    .log-entry { margin-bottom: 4px; padding: 3px 6px; border-radius: 3px; }
-    .log-user { background: #dbeafe; }
-    .log-assistant { background: #dcfce7; }
-    .log-system { background: #fef3c7; color: #92400e; font-size: 0.72rem; }
-    .log-tool { background: #f3e8ff; color: #6b21a8; font-size: 0.72rem; }
+    /* System Prompt */
+    .prompt-editor {
+      width: 100%;
+      min-height: 100px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+    }
+    .prompt-editor:focus { border-color: var(--accent); }
 
-    @media (max-width: 600px) { .settings { grid-template-columns: 1fr; } }
+    /* Buttons */
+    .btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-reset { background: var(--border); color: var(--text); }
+    .btn-accent { background: var(--accent); color: #000; }
+
+    /* Control bar */
+    .control-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .btn-start {
+      padding: 10px 28px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-start.idle { background: var(--green); color: #fff; }
+    .btn-start.active { background: var(--red); color: #fff; }
+    .btn-start:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .status-dot.active { background: var(--green); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .text-inject-bar {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+    }
+    .text-inject-bar input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      outline: none;
+    }
+    .text-inject-bar input:focus { border-color: var(--accent); }
+    .text-inject-bar input::placeholder { color: var(--text-muted); }
+
+    /* Log */
+    .log-panel {
+      grid-column: 1 / -1;
+    }
+    .log {
+      height: 300px;
+      overflow-y: auto;
+      padding: 12px;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      background: var(--bg);
+      border-radius: 4px;
+    }
+    .log-entry {
+      padding: 3px 8px;
+      border-radius: 3px;
+      margin-bottom: 3px;
+      word-break: break-word;
+    }
+    .log-user { background: rgba(59,130,246,0.15); color: #93c5fd; }
+    .log-assistant { background: rgba(34,197,94,0.15); color: #86efac; }
+    .log-system { background: rgba(255,153,0,0.12); color: var(--accent); font-size: 0.72rem; }
+    .log-tool { background: rgba(167,139,250,0.15); color: var(--purple); font-size: 0.72rem; }
+
+    /* Tool toggle */
+    .tool-section {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .tool-section input[type="checkbox"] {
+      width: 16px; height: 16px;
+      accent-color: var(--accent);
+    }
+
+    /* Helpers */
+    .section-label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .config-note {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>AWS Deep Cuts: Nova 2 Sonic Playground</h1>
-      <p>プロンプトを書き換えて Nova 2 Sonic の各機能を体験する</p>
+      <div class="logo">DC</div>
+      <div>
+        <h1>Nova 2 Sonic Playground</h1>
+        <div class="subtitle">AWS Deep Cuts &mdash; Bidirectional Speech-to-Speech</div>
+      </div>
     </header>
 
-    <div class="panel">
-      <div class="settings">
-        <div>
-          <label>Voice</label>
-          <select id="sel-voice">
-            <option value="matthew">matthew (US男性・ポリグロット)</option>
-            <option value="tiffany">tiffany (US女性・ポリグロット)</option>
-            <option value="amy">amy (UK女性)</option>
-            <option value="arjun">arjun (IN男性)</option>
-            <option value="florian">florian (FR男性)</option>
-            <option value="lupe">lupe (ES女性)</option>
-          </select>
+    <div class="main-grid">
+      <!-- Left: Session Config -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Session Config (sessionStart)</h2>
+          <button class="btn btn-reset" onclick="resetSessionConfig()">Reset</button>
         </div>
-        <div>
-          <label>Sensitivity</label>
-          <select id="sel-sensitivity">
-            <option value="LOW">LOW (ゆっくり待つ)</option>
-            <option value="MEDIUM" selected>MEDIUM (標準)</option>
-            <option value="HIGH">HIGH (素早く応答)</option>
-          </select>
-        </div>
-        <div>
-          <label>Server</label>
-          <select id="sel-server">
-            <option value="ws://127.0.0.1:8765">localhost:8765</option>
-          </select>
+        <div class="card-body">
+          <p class="section-label">Inference &amp; Turn Detection</p>
+          <textarea id="session-config" class="json-editor" spellcheck="false"></textarea>
+          <p class="config-note">maxTokens, topP, temperature, endpointingSensitivity (HIGH / MEDIUM / LOW)</p>
         </div>
       </div>
 
-      <div class="prompt-section">
-        <label>System Prompt（セッション開始前に編集してください）</label>
-        <textarea id="system-prompt">You are a friendly English conversation partner. Keep responses short (1-2 sentences). Respond in the same language as the user.</textarea>
+      <!-- Right: Prompt Config -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Prompt Config (promptStart)</h2>
+          <button class="btn btn-reset" onclick="resetPromptConfig()">Reset</button>
+        </div>
+        <div class="card-body">
+          <p class="section-label">Audio Output &amp; Voice</p>
+          <textarea id="prompt-config" class="json-editor" spellcheck="false"></textarea>
+          <p class="config-note">voiceId: matthew, tiffany, amy, arjun, florian, lupe, carlos, ambre, lennart, beatrice, lorenzo, tina, carolina, leo, kiara, olivia</p>
+        </div>
       </div>
 
-      <div class="tool-toggle">
-        <input type="checkbox" id="chk-tools">
-        <label for="chk-tools">Tool use を有効にする（天気情報取得）</label>
+      <!-- Left: System Prompt -->
+      <div class="card">
+        <div class="card-header">
+          <h2>System Prompt</h2>
+          <button class="btn btn-reset" onclick="resetSystemPrompt()">Reset</button>
+        </div>
+        <div class="card-body">
+          <textarea id="system-prompt" class="prompt-editor" spellcheck="false"></textarea>
+          <div class="tool-section">
+            <input type="checkbox" id="chk-tools">
+            <label for="chk-tools">Tool use (天気取得) を有効にする</label>
+          </div>
+        </div>
       </div>
 
-      <div class="controls">
-        <button id="btn-mic" class="off" disabled></button>
-        <span class="status" id="status">Server未接続</span>
+      <!-- Right: Quick Reference -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Quick Reference</h2>
+        </div>
+        <div class="card-body" style="font-size: 0.75rem; line-height: 1.8; color: var(--text-muted);">
+          <strong style="color: var(--text);">Verification Points:</strong><br>
+          1. 通常: AI から話しかけない<br>
+          2. Model-start-first: AI から先に話す<br>
+          3. voiceId 変更: 声質が変わる<br>
+          4. 言語変更: ポリグロットボイスで多言語<br>
+          5. ターンテイキング &amp; barge-in<br>
+          6. 抑揚/テンションが応答に影響<br>
+          7. Tool use で天気取得<br>
+          8. 発話スピードの制御<br>
+          <br>
+          <strong style="color: var(--text);">Cross-modal Text Input:</strong><br>
+          セッション中に下のテキスト入力でメッセージを送信可能（Model-start-first 等）
+        </div>
       </div>
-    </div>
 
-    <div class="panel">
-      <div class="log" id="log"></div>
+      <!-- Control Bar -->
+      <div class="control-bar">
+        <button id="btn-start" class="btn-start idle">Start</button>
+        <div class="status-indicator">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text">Ready</span>
+        </div>
+        <div class="text-inject-bar">
+          <input type="text" id="text-input" placeholder="Cross-modal text input (Enter で送信)" disabled>
+          <button class="btn btn-accent" id="btn-send" disabled onclick="sendTextInput()">Send</button>
+        </div>
+      </div>
+
+      <!-- Log Panel -->
+      <div class="card log-panel">
+        <div class="card-header">
+          <h2>Log</h2>
+          <button class="btn btn-reset" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="card-body" style="padding: 0;">
+          <div class="log" id="log"></div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
-    const btnMic = document.getElementById('btn-mic');
-    const statusEl = document.getElementById('status');
-    const logEl = document.getElementById('log');
-    const promptEl = document.getElementById('system-prompt');
+    // ─── Default Configs ─────────────────────────────
+    const DEFAULT_SESSION_CONFIG = {
+      inferenceConfiguration: {
+        maxTokens: 1024,
+        topP: 0.9,
+        temperature: 0.7
+      },
+      turnDetectionConfiguration: {
+        endpointingSensitivity: "MEDIUM"
+      }
+    };
 
+    const DEFAULT_PROMPT_CONFIG = {
+      audioOutputConfiguration: {
+        mediaType: "audio/lpcm",
+        sampleRateHertz: 24000,
+        sampleSizeBits: 16,
+        channelCount: 1,
+        voiceId: "matthew",
+        encoding: "base64",
+        audioType: "SPEECH"
+      },
+      textOutputConfiguration: {
+        mediaType: "text/plain"
+      }
+    };
+
+    const DEFAULT_SYSTEM_PROMPT = "You are a friendly English conversation partner. Keep responses short (1-2 sentences). Respond in the same language as the user.";
+
+    // ─── DOM Elements ────────────────────────────────
+    const sessionConfigEl = document.getElementById('session-config');
+    const promptConfigEl = document.getElementById('prompt-config');
+    const systemPromptEl = document.getElementById('system-prompt');
+    const btnStart = document.getElementById('btn-start');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const logEl = document.getElementById('log');
+    const textInput = document.getElementById('text-input');
+    const btnSend = document.getElementById('btn-send');
+    const chkTools = document.getElementById('chk-tools');
+
+    // ─── State ───────────────────────────────────────
     let ws = null;
     let audioContext = null;
     let mediaStream = null;
     let scriptProcessor = null;
     let isStreaming = false;
-
-    // 再生用
     let playbackCtx = null;
     let nextPlayTime = 0;
 
-    btnMic.disabled = false;
-    btnMic.addEventListener('click', () => {
-      if (isStreaming) {
-        stopSession();
-      } else {
-        startSession();
+    // ─── Init ────────────────────────────────────────
+    resetSessionConfig();
+    resetPromptConfig();
+    resetSystemPrompt();
+
+    btnStart.addEventListener('click', () => {
+      if (isStreaming) stopSession();
+      else startSession();
+    });
+
+    textInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendTextInput();
       }
     });
 
-    async function startSession() {
+    // ─── Reset Functions ─────────────────────────────
+    function resetSessionConfig() {
+      sessionConfigEl.value = JSON.stringify(DEFAULT_SESSION_CONFIG, null, 2);
+      sessionConfigEl.classList.remove('error');
+    }
+    function resetPromptConfig() {
+      promptConfigEl.value = JSON.stringify(DEFAULT_PROMPT_CONFIG, null, 2);
+      promptConfigEl.classList.remove('error');
+    }
+    function resetSystemPrompt() {
+      systemPromptEl.value = DEFAULT_SYSTEM_PROMPT;
+    }
+
+    // ─── JSON Validation ─────────────────────────────
+    function parseConfig(el) {
       try {
-        // マイク取得
+        const obj = JSON.parse(el.value);
+        el.classList.remove('error');
+        return obj;
+      } catch (e) {
+        el.classList.add('error');
+        return null;
+      }
+    }
+
+    // ─── Session Management ──────────────────────────
+    async function startSession() {
+      const sessionConfig = parseConfig(sessionConfigEl);
+      const promptConfig = parseConfig(promptConfigEl);
+      if (!sessionConfig || !promptConfig) {
+        addLog('system', 'JSON parse error — config を確認してください');
+        return;
+      }
+
+      try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
           audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
         });
@@ -145,26 +459,23 @@
         source.connect(scriptProcessor);
         scriptProcessor.connect(audioContext.destination);
 
-        // WebSocket接続
-        const serverUrl = document.getElementById('sel-server').value;
-        ws = new WebSocket(serverUrl);
+        ws = new WebSocket('ws://127.0.0.1:8765');
 
         ws.onopen = () => {
-          // セッション開始
           const config = {
-            systemPrompt: promptEl.value,
-            voiceId: document.getElementById('sel-voice').value,
-            sensitivity: document.getElementById('sel-sensitivity').value,
-            enableTools: document.getElementById('chk-tools').checked,
+            sessionConfig: sessionConfig,
+            promptConfig: promptConfig,
+            systemPrompt: systemPromptEl.value,
+            enableTools: chkTools.checked,
           };
           ws.send(JSON.stringify({ type: 'start', config }));
           isStreaming = true;
-          btnMic.classList.remove('off');
-          statusEl.textContent = 'Connected';
-          statusEl.className = 'status active';
-          addLog('system', `Session started (voice: ${config.voiceId}, sensitivity: ${config.sensitivity})`);
+          setUIState('active');
 
-          // 音声送信開始
+          const voiceId = promptConfig.audioOutputConfiguration?.voiceId || 'matthew';
+          const sensitivity = sessionConfig.turnDetectionConfiguration?.endpointingSensitivity || 'MEDIUM';
+          addLog('system', `Session started (voice: ${voiceId}, sensitivity: ${sensitivity})`);
+
           scriptProcessor.onaudioprocess = (e) => {
             if (!isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
             const float32 = e.inputBuffer.getChannelData(0);
@@ -173,28 +484,19 @@
               const s = Math.max(-1, Math.min(1, float32[i]));
               int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
             }
-            const b64 = arrayBufferToBase64(int16.buffer);
-            ws.send(JSON.stringify({ type: 'audio', data: b64 }));
+            ws.send(JSON.stringify({ type: 'audio', data: arrayBufferToBase64(int16.buffer) }));
           };
         };
 
-        ws.onmessage = (event) => {
-          const msg = JSON.parse(event.data);
-          handleMessage(msg);
-        };
-
-        ws.onclose = () => {
-          if (isStreaming) stopSession();
-        };
-
+        ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
+        ws.onclose = () => { if (isStreaming) stopSession(); };
         ws.onerror = () => {
-          addLog('system', 'WebSocket接続エラー — server.py が起動しているか確認してください');
+          addLog('system', 'WebSocket error — server.py が起動しているか確認');
           stopSession();
         };
 
       } catch (err) {
         addLog('system', 'Error: ' + err.message);
-        alert('マイクへのアクセスを許可してください。\n\nError: ' + err.message);
       }
     }
 
@@ -208,35 +510,59 @@
       if (scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
       if (audioContext) { audioContext.close(); audioContext = null; }
       if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-      btnMic.classList.add('off');
-      statusEl.textContent = 'Disconnected';
-      statusEl.className = 'status';
+      setUIState('idle');
       addLog('system', 'Session ended');
     }
 
+    function sendTextInput() {
+      const text = textInput.value.trim();
+      if (!text || !isStreaming || !ws) return;
+      ws.send(JSON.stringify({ type: 'textInject', content: text }));
+      addLog('user', `[text] ${text}`);
+      textInput.value = '';
+    }
+
+    // ─── UI State ────────────────────────────────────
+    function setUIState(state) {
+      if (state === 'active') {
+        btnStart.textContent = 'Stop';
+        btnStart.className = 'btn-start active';
+        statusDot.classList.add('active');
+        statusText.textContent = 'Streaming';
+        textInput.disabled = false;
+        btnSend.disabled = false;
+      } else {
+        btnStart.textContent = 'Start';
+        btnStart.className = 'btn-start idle';
+        statusDot.classList.remove('active');
+        statusText.textContent = 'Ready';
+        textInput.disabled = true;
+        btnSend.disabled = true;
+      }
+    }
+
+    // ─── Message Handler ─────────────────────────────
     function handleMessage(msg) {
       switch (msg.type) {
         case 'transcript':
-          const role = msg.role === 'USER' ? 'user' : 'assistant';
-          addLog(role, msg.content);
+          addLog(msg.role === 'USER' ? 'user' : 'assistant', msg.content);
           break;
         case 'audio':
           playAudio(msg.data);
           break;
         case 'toolCall':
-          addLog('tool', `🔧 Tool: ${msg.toolName} — ${msg.params}`);
+          addLog('tool', `Tool: ${msg.toolName}(${msg.params})`);
           break;
         case 'state':
-          if (msg.state === 'ended') {
-            addLog('system', 'Bedrock session ended (8分制限 or エラー)');
-          }
+          if (msg.state === 'ended') addLog('system', 'Bedrock session ended');
           break;
         case 'error':
-          addLog('system', '⚠️ ' + msg.message);
+          addLog('system', 'Error: ' + msg.message);
           break;
       }
     }
 
+    // ─── Audio Playback ──────────────────────────────
     function playAudio(base64Data) {
       if (!playbackCtx) {
         playbackCtx = new AudioContext({ sampleRate: 24000 });
@@ -259,22 +585,24 @@
       nextPlayTime += buffer.duration;
     }
 
+    // ─── Log ─────────────────────────────────────────
     function addLog(type, text) {
       const div = document.createElement('div');
       div.className = `log-entry log-${type}`;
-      const prefix = type === 'user' ? '🎤 You: ' : type === 'assistant' ? '🤖 AI: ' : type === 'tool' ? '' : '⚙️ ';
-      div.textContent = prefix + text;
+      const prefixes = { user: 'You: ', assistant: 'AI: ', tool: '', system: '' };
+      div.textContent = (prefixes[type] || '') + text;
       logEl.appendChild(div);
       logEl.scrollTop = logEl.scrollHeight;
     }
+    function clearLog() { logEl.innerHTML = ''; }
 
+    // ─── Utilities ───────────────────────────────────
     function arrayBufferToBase64(buf) {
       const bytes = new Uint8Array(buf);
       let binary = '';
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       return btoa(binary);
     }
-
     function base64ToArrayBuffer(b64) {
       const binary = atob(b64);
       const bytes = new Uint8Array(binary.length);

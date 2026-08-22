@@ -5,7 +5,7 @@ AWS Deep Cuts: Amazon Nova 2 Sonic — WebSocket 中継サーバー
 セキュリティ: 127.0.0.1 にのみバインドし、外部からのアクセスを遮断する。
 
 起動方法:
-  python3 server.py
+  python server.py
 
 依存パッケージ:
   pip install boto3 websockets
@@ -21,8 +21,7 @@ import sys
 from typing import Optional
 
 import boto3
-import websockets
-from websockets.server import serve
+from websockets.asyncio.server import serve
 
 # ─── 設定 ────────────────────────────────────────────────────────
 HOST = "127.0.0.1"  # localhost のみ — セキュリティのため外部バインドしない
@@ -50,36 +49,47 @@ class SonicSession:
     async def start(self):
         self.is_active = True
 
+        # クライアントから送られた設定を使用
+        session_config = self.config.get("sessionConfig", {})
+        prompt_config = self.config.get("promptConfig", {})
         system_prompt = self.config.get("systemPrompt", "You are a helpful assistant.")
-        voice_id = self.config.get("voiceId", "matthew")
-        sensitivity = self.config.get("sensitivity", "MEDIUM")
         enable_tools = self.config.get("enableTools", False)
 
-        # 1. SessionStart
-        await self._enqueue({
+        # 1. SessionStart — クライアント指定の設定をそのまま使用
+        session_start_event = {
             "event": {
-                "sessionStart": {
-                    "inferenceConfiguration": {"maxTokens": 1024, "topP": 0.9, "temperature": 0.7},
-                    "turnDetectionConfiguration": {"endpointingSensitivity": sensitivity},
-                }
+                "sessionStart": session_config
             }
-        })
+        }
+        # デフォルト値の保証
+        if "inferenceConfiguration" not in session_config:
+            session_start_event["event"]["sessionStart"]["inferenceConfiguration"] = {
+                "maxTokens": 1024, "topP": 0.9, "temperature": 0.7
+            }
+        if "turnDetectionConfiguration" not in session_config:
+            session_start_event["event"]["sessionStart"]["turnDetectionConfiguration"] = {
+                "endpointingSensitivity": "MEDIUM"
+            }
+        await self._enqueue(session_start_event)
 
-        # 2. PromptStart
+        # 2. PromptStart — クライアント指定の audioOutputConfiguration を使用
+        audio_output = prompt_config.get("audioOutputConfiguration", {
+            "mediaType": "audio/lpcm",
+            "sampleRateHertz": 24000,
+            "sampleSizeBits": 16,
+            "channelCount": 1,
+            "voiceId": "matthew",
+            "encoding": "base64",
+            "audioType": "SPEECH",
+        })
+        text_output = prompt_config.get("textOutputConfiguration", {"mediaType": "text/plain"})
+
         prompt_start: dict = {
             "event": {
                 "promptStart": {
                     "promptName": self.prompt_name,
-                    "textOutputConfiguration": {"mediaType": "text/plain"},
-                    "audioOutputConfiguration": {
-                        "mediaType": "audio/lpcm",
-                        "sampleRateHertz": 24000,
-                        "sampleSizeBits": 16,
-                        "channelCount": 1,
-                        "voiceId": voice_id,
-                        "encoding": "base64",
-                        "audioType": "SPEECH",
-                    },
+                    "textOutputConfiguration": text_output,
+                    "audioOutputConfiguration": audio_output,
                 }
             }
         }
@@ -161,7 +171,7 @@ class SonicSession:
         })
 
     async def inject_text(self, text: str):
-        """Cross-modal text input"""
+        """Cross-modal text input (USER role)"""
         if not self.is_active:
             return
         cn = str(uuid.uuid4())
@@ -204,9 +214,12 @@ class SonicSession:
     async def _enqueue(self, event):
         await self.event_queue.put(event)
 
-    async def _input_generator(self):
+    def _sync_input_generator(self):
+        """同期ジェネレーター（boto3用）— asyncio キューからイベントを取り出す"""
+        loop = asyncio.get_event_loop()
         while True:
-            item = await self.event_queue.get()
+            future = asyncio.run_coroutine_threadsafe(self.event_queue.get(), loop)
+            item = future.result()
             if item is None:
                 return
             yield {"chunk": {"bytes": json.dumps(item).encode("utf-8")}}
@@ -231,16 +244,6 @@ class SonicSession:
         finally:
             self.is_active = False
             await self._send_ws({"type": "state", "state": "ended"})
-
-    def _sync_input_generator(self):
-        """同期ジェネレーター（boto3用）— asyncio キューからイベントを取り出す"""
-        loop = asyncio.get_event_loop()
-        while True:
-            future = asyncio.run_coroutine_threadsafe(self.event_queue.get(), loop)
-            item = future.result()
-            if item is None:
-                return
-            yield {"chunk": {"bytes": json.dumps(item).encode("utf-8")}}
 
     async def _handle_output(self, raw_bytes: bytes):
         """Bedrock からの出力イベントを処理"""
@@ -280,20 +283,40 @@ class SonicSession:
             result = await self._execute_tool(tool_name, tool_content)
 
             # ToolResult を返す
+            tool_cn = str(uuid.uuid4())
+            await self._enqueue({
+                "event": {
+                    "contentStart": {
+                        "promptName": self.prompt_name,
+                        "contentName": tool_cn,
+                        "interactive": False,
+                        "type": "TOOL",
+                        "role": "TOOL",
+                        "toolResultInputConfiguration": {
+                            "toolUseId": tool_use_id,
+                            "type": "TEXT",
+                            "textInputConfiguration": {"mediaType": "text/plain"},
+                        },
+                    }
+                }
+            })
             await self._enqueue({
                 "event": {
                     "toolResult": {
                         "promptName": self.prompt_name,
-                        "contentName": str(uuid.uuid4()),
-                        "content": json.dumps(result),
+                        "contentName": tool_cn,
+                        "content": json.dumps(result, ensure_ascii=False),
                     }
                 }
+            })
+            await self._enqueue({
+                "event": {"contentEnd": {"promptName": self.prompt_name, "contentName": tool_cn}}
             })
 
     async def _execute_tool(self, tool_name: str, params_json: str) -> dict:
         """ツールを実行して結果を返す"""
         try:
-            params = json.loads(params_json)
+            params = json.loads(params_json) if isinstance(params_json, str) else params_json
         except json.JSONDecodeError:
             return {"error": "Invalid JSON parameters"}
 
@@ -304,8 +327,8 @@ class SonicSession:
 
     async def _send_ws(self, msg: dict):
         try:
-            await self.ws.send(json.dumps(msg))
-        except websockets.exceptions.ConnectionClosed:
+            await self.ws.send(json.dumps(msg, ensure_ascii=False))
+        except Exception:
             pass
 
 
@@ -320,7 +343,6 @@ async def handle_connection(ws):
             msg_type = msg.get("type", "")
 
             if msg_type == "start":
-                # 新しいセッション開始
                 if session:
                     await session.close()
                 session = SonicSession(ws, msg.get("config", {}))
@@ -338,7 +360,7 @@ async def handle_connection(ws):
                     await session.close()
                     session = None
 
-    except websockets.exceptions.ConnectionClosed:
+    except Exception:
         pass
     finally:
         if session:

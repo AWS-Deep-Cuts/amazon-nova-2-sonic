@@ -21,6 +21,7 @@ AWS Deep Cutsは、AWS の最新のサービスやニッチな機能、または
 5. ターンテイキングと割り込み (barge-in) が自然に動作すること
 6. 話し方の抑揚・テンションが AI の応答スタイルにも影響すること
 7. Tool use で外部情報（今日の天気）を取得できること
+8. プロンプトで発話スピードを制御できること
 
 ## ハンズオン手順
 
@@ -106,9 +107,9 @@ xdg-open index.html
 #### 観点 3: 話者 (voiceId) の変更
 
 **確認手順:**
-1. Voice ドロップダウンから `matthew (US男性)` を選択して Start → 何か話す → Stop
-2. Voice を `tiffany (US女性)` に変えて Start → 同じことを話す → Stop
-3. Voice を `amy (UK女性)` に変えて Start → 同じことを話す → Stop
+1. Prompt Config の `audioOutputConfiguration.voiceId` を `"matthew"` にして Start → 何か話す → Stop
+2. `voiceId` を `"tiffany"` に変えて Start → 同じことを話す → Stop
+3. `voiceId` を `"amy"` に変えて Start → 同じことを話す → Stop
 
 **確認ポイント**: 同じプロンプト・同じ質問でも、voiceId によって声質・アクセントが明確に変わることを確認してください。
 
@@ -119,7 +120,7 @@ xdg-open index.html
 #### 観点 4: 言語の変更（ポリグロット）
 
 **確認手順:**
-1. Voice を `matthew` (ポリグロット) にする
+1. Prompt Config の `voiceId` を `"matthew"` (ポリグロット) にする
 2. System Prompt を以下に変更:
    ```
    You are a helpful assistant. Always respond in French.
@@ -136,14 +137,14 @@ xdg-open index.html
 #### 観点 5: ターンテイキングと割り込み (barge-in)
 
 **ターンテイキングの確認:**
-1. Sensitivity を `LOW` に設定して Start
+1. Session Config の `endpointingSensitivity` を `"LOW"` に設定して Start
 2. ゆっくり、途中で 2〜3 秒ポーズを入れながら話す（例: "I think... um... maybe... we should..."）
 3. AI がポーズ中に割り込まず、発話完了を待つことを確認する
-4. Stop → Sensitivity を `HIGH` にして同じことを試す
+4. Stop → `endpointingSensitivity` を `"HIGH"` にして同じことを試す
 5. AI が短いポーズで即座に応答を始めることを確認する
 
 **barge-in（割り込み）の確認:**
-1. Sensitivity を `MEDIUM` にして Start
+1. `endpointingSensitivity` を `"MEDIUM"` にして Start
 2. 何か質問して AI に長めの応答をさせる（例: "Tell me everything you know about Japan"）
 3. **AI が話している最中に** 大きな声で割り込む（例: "Stop! I have a different question."）
 4. AI が発話を中断し、あなたの新しい質問に応答することを確認する
@@ -174,10 +175,28 @@ xdg-open index.html
    You are a helpful weather assistant. When the user asks about the weather, use the get_weather tool to fetch real data. Report the results naturally in speech.
    ```
 3. Start → 「今日の東京の天気を教えて」と話しかける
-4. ログに `🔧 Tool: get_weather` が表示され、AI が実際の天気情報を音声で報告することを確認する
+4. ログに `Tool: get_weather` が表示され、AI が実際の天気情報を音声で報告することを確認する
 5. 「大阪の天気は？」「福岡は？」など別の地域も試す
 
 **仕組み**: Nova 2 Sonic が `toolUse` イベントを送信 → サーバーが気象庁 API を呼び出し → `toolResult` でモデルに結果を返す → モデルが結果を音声で報告する。
+
+---
+
+#### 観点 8: 発話スピードの制御
+
+**確認手順:**
+1. System Prompt を以下に変更して Start:
+   ```
+   You are a helpful assistant. Speak very slowly and clearly, as if explaining to a young child. Take your time with each word.
+   ```
+2. 何か質問して AI の応答スピードが遅いことを確認する
+3. Stop → System Prompt を以下に変更して再度 Start:
+   ```
+   You are an excited sports commentator. Speak extremely fast and energetically, like you're calling a thrilling game-winning play!
+   ```
+4. 同じ質問をして、AI の応答スピードが明らかに速くなることを確認する
+
+**ポイント**: Nova 2 Sonic はシステムプロンプトの指示に従って発話速度を調整できます。教育用途（ゆっくり明瞭に）やエンタメ用途（テンポよく）など、ユースケースに応じた制御が可能です。
 
 ---
 
