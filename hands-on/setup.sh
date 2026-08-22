@@ -4,7 +4,7 @@
 #
 # このスクリプトは以下を行います:
 #   1. AWS 認証確認
-#   2. Bedrock モデル疎通確認
+#   2. Bedrock モデル疎通確認 (Python/boto3)
 #   3. Python 依存パッケージ確認/インストール
 #   4. WebSocket 中継サーバーの起動
 #
@@ -18,17 +18,6 @@ AWS_REGION="${AWS_REGION:-ap-northeast-1}"
 MODEL_ID="amazon.nova-2-sonic-v1:0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Windows 環境では aws.exe を使う場合がある
-if command -v aws &>/dev/null; then
-  AWS_CMD="aws"
-elif command -v aws.exe &>/dev/null; then
-  AWS_CMD="aws.exe"
-else
-  echo "  ⚠️  AWS CLI が見つかりません。"
-  echo "  https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
-  exit 1
-fi
-
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  AWS Deep Cuts - Amazon Nova 2 Sonic"
@@ -38,23 +27,50 @@ echo "  Region: ${AWS_REGION}"
 echo "  Model:  ${MODEL_ID}"
 echo ""
 
-# ─── Step 1: AWS 認証確認 ─────────────────────────────────────
+# ─── Python を特定 ────────────────────────────────────────────
+PYTHON_CMD=""
+if command -v python3 &>/dev/null; then
+  PYTHON_CMD="python3"
+elif command -v python &>/dev/null; then
+  PYTHON_CMD="python"
+else
+  echo "  ⚠️  Python が見つかりません。Python 3.9 以上をインストールしてください。"
+  exit 1
+fi
+
+# ─── Step 1: AWS 認証確認 (boto3) ─────────────────────────────
 echo "Step 1/4: AWS 認証を確認"
-ACCOUNT_ID="$(${AWS_CMD} sts get-caller-identity --query Account --output text 2>/dev/null)" || {
+ACCOUNT_ID=$("${PYTHON_CMD}" -c "
+import boto3, sys
+try:
+    sts = boto3.client('sts')
+    print(sts.get_caller_identity()['Account'])
+except Exception as e:
+    print(str(e), file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null) || {
   echo "  ⚠️  AWS 認証に失敗しました。"
   echo "  'aws configure' で認証情報を設定してください。"
+  echo ""
+  echo "  boto3 が未インストールの場合:"
+  echo "    ${PYTHON_CMD} -m pip install boto3"
   exit 1
 }
 echo "  Account: ${ACCOUNT_ID} ✓"
 echo ""
 
-# ─── Step 2: Bedrock モデル疎通確認 ───────────────────────────
+# ─── Step 2: Bedrock モデル疎通確認 (boto3) ───────────────────
 echo "Step 2/4: Bedrock モデル疎通を確認"
-MODEL_CHECK=$(${AWS_CMD} bedrock get-foundation-model \
-  --model-identifier "${MODEL_ID}" \
-  --region "${AWS_REGION}" \
-  --query "modelDetails.modelId" \
-  --output text 2>/dev/null) || true
+MODEL_CHECK=$("${PYTHON_CMD}" -c "
+import boto3, sys
+try:
+    client = boto3.client('bedrock', region_name='${AWS_REGION}')
+    resp = client.get_foundation_model(modelIdentifier='${MODEL_ID}')
+    print(resp['modelDetails']['modelId'])
+except Exception as e:
+    print(str(e), file=sys.stderr)
+    sys.exit(1)
+" 2>/dev/null) || true
 
 if [ "${MODEL_CHECK}" = "${MODEL_ID}" ]; then
   echo "  ${MODEL_ID}: OK ✓"
@@ -77,20 +93,11 @@ echo ""
 
 # ─── Step 3: Python 依存パッケージ ────────────────────────────
 echo "Step 3/4: Python パッケージを確認"
-PYTHON_CMD=""
-if command -v python3 &>/dev/null; then
-  PYTHON_CMD="python3"
-elif command -v python &>/dev/null; then
-  PYTHON_CMD="python"
-else
-  echo "  ⚠️  Python が見つかりません。Python 3.9 以上をインストールしてください。"
-  exit 1
-fi
 
-# boto3 と websockets の確認・インストール
-${PYTHON_CMD} -c "import boto3, websockets" 2>/dev/null || {
-  echo "  必要なパッケージをインストールします..."
-  ${PYTHON_CMD} -m pip install --quiet boto3 websockets
+# websockets の確認・インストール (boto3 は Step 1-2 で確認済み)
+"${PYTHON_CMD}" -c "import websockets" 2>/dev/null || {
+  echo "  websockets をインストールします..."
+  "${PYTHON_CMD}" -m pip install --quiet websockets
 }
 echo "  boto3, websockets: OK ✓"
 echo ""
@@ -109,4 +116,4 @@ echo "  停止: Ctrl+C"
 echo ""
 
 cd "${SCRIPT_DIR}"
-AWS_REGION="${AWS_REGION}" ${PYTHON_CMD} server.py
+AWS_REGION="${AWS_REGION}" "${PYTHON_CMD}" server.py

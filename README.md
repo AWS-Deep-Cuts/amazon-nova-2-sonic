@@ -37,10 +37,12 @@ AWS Deep Cutsは、AWS の最新のサービスやニッチな機能、または
 ```bash
 git clone https://github.com/AWS-Deep-Cuts/amazon-nova-2-sonic.git
 cd amazon-nova-2-sonic/hands-on
-bash setup.sh
+python setup.py
 ```
 
-setup.sh が認証確認・パッケージ確認を行い、WebSocket 中継サーバーを起動します。以下の表示が出れば準備完了です。
+> **Note**: macOS / Linux の場合は `python3 setup.py` を使用してください。
+
+setup.py が認証確認・パッケージ確認を行い、WebSocket 中継サーバーを起動します。以下の表示が出れば準備完了です。
 
 ```
   WebSocket: ws://127.0.0.1:8765
