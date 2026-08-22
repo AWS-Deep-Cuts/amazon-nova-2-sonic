@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS Deep Cuts: Nova 2 Sonic Playground</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f6f8; color: #1f2937; padding: 20px; }
+    .container { max-width: 780px; margin: 0 auto; }
+    header { background: #232f3e; color: #fff; padding: 18px 20px; border-radius: 8px 8px 0 0; }
+    header h1 { font-size: 1.1rem; }
+    header p { font-size: 0.75rem; color: #adb5bd; margin-top: 4px; }
+
+    .panel { background: #fff; border: 1px solid #dbe4ee; border-top: none; padding: 16px 20px; }
+    .panel:last-of-type { border-radius: 0 0 8px 8px; }
+
+    /* 設定 */
+    .settings { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .settings label { font-size: 0.7rem; color: #6b7280; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .settings select { width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.8rem; }
+
+    /* プロンプト */
+    .prompt-section { margin-top: 12px; }
+    .prompt-section label { font-size: 0.7rem; color: #6b7280; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+    textarea { width: 100%; height: 90px; padding: 10px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.8rem; font-family: inherit; resize: vertical; line-height: 1.5; }
+
+    /* ツール */
+    .tool-toggle { margin-top: 10px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; }
+    .tool-toggle input { width: 16px; height: 16px; }
+
+    /* コントロール */
+    .controls { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+    button { padding: 8px 16px; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #btn-mic { background: #dc2626; color: #fff; min-width: 140px; }
+    #btn-mic.off { background: #16a34a; }
+    #btn-mic.off::before { content: "🎤 Start"; }
+    #btn-mic:not(.off)::before { content: "⏹ Stop"; }
+    .status { font-size: 0.75rem; color: #6b7280; }
+    .status.active { color: #16a34a; font-weight: 600; }
+
+    /* ログ */
+    .log { height: 260px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; padding: 10px; margin-top: 12px; background: #fafbfc; font-size: 0.78rem; line-height: 1.6; }
+    .log-entry { margin-bottom: 4px; padding: 3px 6px; border-radius: 3px; }
+    .log-user { background: #dbeafe; }
+    .log-assistant { background: #dcfce7; }
+    .log-system { background: #fef3c7; color: #92400e; font-size: 0.72rem; }
+    .log-tool { background: #f3e8ff; color: #6b21a8; font-size: 0.72rem; }
+
+    @media (max-width: 600px) { .settings { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AWS Deep Cuts: Nova 2 Sonic Playground</h1>
+      <p>プロンプトを書き換えて Nova 2 Sonic の各機能を体験する</p>
+    </header>
+
+    <div class="panel">
+      <div class="settings">
+        <div>
+          <label>Voice</label>
+          <select id="sel-voice">
+            <option value="matthew">matthew (US男性・ポリグロット)</option>
+            <option value="tiffany">tiffany (US女性・ポリグロット)</option>
+            <option value="amy">amy (UK女性)</option>
+            <option value="arjun">arjun (IN男性)</option>
+            <option value="florian">florian (FR男性)</option>
+            <option value="lupe">lupe (ES女性)</option>
+          </select>
+        </div>
+        <div>
+          <label>Sensitivity</label>
+          <select id="sel-sensitivity">
+            <option value="LOW">LOW (ゆっくり待つ)</option>
+            <option value="MEDIUM" selected>MEDIUM (標準)</option>
+            <option value="HIGH">HIGH (素早く応答)</option>
+          </select>
+        </div>
+        <div>
+          <label>Server</label>
+          <select id="sel-server">
+            <option value="ws://127.0.0.1:8765">localhost:8765</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="prompt-section">
+        <label>System Prompt（セッション開始前に編集してください）</label>
+        <textarea id="system-prompt">You are a friendly English conversation partner. Keep responses short (1-2 sentences). Respond in the same language as the user.</textarea>
+      </div>
+
+      <div class="tool-toggle">
+        <input type="checkbox" id="chk-tools">
+        <label for="chk-tools">Tool use を有効にする（天気情報取得）</label>
+      </div>
+
+      <div class="controls">
+        <button id="btn-mic" class="off" disabled></button>
+        <span class="status" id="status">Server未接続</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <script>
+    const btnMic = document.getElementById('btn-mic');
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('log');
+    const promptEl = document.getElementById('system-prompt');
+
+    let ws = null;
+    let audioContext = null;
+    let mediaStream = null;
+    let scriptProcessor = null;
+    let isStreaming = false;
+
+    // 再生用
+    let playbackCtx = null;
+    let nextPlayTime = 0;
+
+    btnMic.disabled = false;
+    btnMic.addEventListener('click', () => {
+      if (isStreaming) {
+        stopSession();
+      } else {
+        startSession();
+      }
+    });
+
+    async function startSession() {
+      try {
+        // マイク取得
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+        });
+        audioContext = new AudioContext({ sampleRate: 16000 });
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
+        source.connect(scriptProcessor);
+        scriptProcessor.connect(audioContext.destination);
+
+        // WebSocket接続
+        const serverUrl = document.getElementById('sel-server').value;
+        ws = new WebSocket(serverUrl);
+
+        ws.onopen = () => {
+          // セッション開始
+          const config = {
+            systemPrompt: promptEl.value,
+            voiceId: document.getElementById('sel-voice').value,
+            sensitivity: document.getElementById('sel-sensitivity').value,
+            enableTools: document.getElementById('chk-tools').checked,
+          };
+          ws.send(JSON.stringify({ type: 'start', config }));
+          isStreaming = true;
+          btnMic.classList.remove('off');
+          statusEl.textContent = 'Connected';
+          statusEl.className = 'status active';
+          addLog('system', `Session started (voice: ${config.voiceId}, sensitivity: ${config.sensitivity})`);
+
+          // 音声送信開始
+          scriptProcessor.onaudioprocess = (e) => {
+            if (!isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
+            const float32 = e.inputBuffer.getChannelData(0);
+            const int16 = new Int16Array(float32.length);
+            for (let i = 0; i < float32.length; i++) {
+              const s = Math.max(-1, Math.min(1, float32[i]));
+              int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            const b64 = arrayBufferToBase64(int16.buffer);
+            ws.send(JSON.stringify({ type: 'audio', data: b64 }));
+          };
+        };
+
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data);
+          handleMessage(msg);
+        };
+
+        ws.onclose = () => {
+          if (isStreaming) stopSession();
+        };
+
+        ws.onerror = () => {
+          addLog('system', 'WebSocket接続エラー — server.py が起動しているか確認してください');
+          stopSession();
+        };
+
+      } catch (err) {
+        addLog('system', 'Error: ' + err.message);
+        alert('マイクへのアクセスを許可してください。\n\nError: ' + err.message);
+      }
+    }
+
+    function stopSession() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'stop' }));
+        ws.close();
+      }
+      ws = null;
+      isStreaming = false;
+      if (scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
+      if (audioContext) { audioContext.close(); audioContext = null; }
+      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+      btnMic.classList.add('off');
+      statusEl.textContent = 'Disconnected';
+      statusEl.className = 'status';
+      addLog('system', 'Session ended');
+    }
+
+    function handleMessage(msg) {
+      switch (msg.type) {
+        case 'transcript':
+          const role = msg.role === 'USER' ? 'user' : 'assistant';
+          addLog(role, msg.content);
+          break;
+        case 'audio':
+          playAudio(msg.data);
+          break;
+        case 'toolCall':
+          addLog('tool', `🔧 Tool: ${msg.toolName} — ${msg.params}`);
+          break;
+        case 'state':
+          if (msg.state === 'ended') {
+            addLog('system', 'Bedrock session ended (8分制限 or エラー)');
+          }
+          break;
+        case 'error':
+          addLog('system', '⚠️ ' + msg.message);
+          break;
+      }
+    }
+
+    function playAudio(base64Data) {
+      if (!playbackCtx) {
+        playbackCtx = new AudioContext({ sampleRate: 24000 });
+        nextPlayTime = playbackCtx.currentTime;
+      }
+      const bytes = base64ToArrayBuffer(base64Data);
+      const int16 = new Int16Array(bytes);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768.0;
+
+      const buffer = playbackCtx.createBuffer(1, float32.length, 24000);
+      buffer.getChannelData(0).set(float32);
+      const src = playbackCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(playbackCtx.destination);
+
+      const now = playbackCtx.currentTime;
+      if (nextPlayTime < now) nextPlayTime = now;
+      src.start(nextPlayTime);
+      nextPlayTime += buffer.duration;
+    }
+
+    function addLog(type, text) {
+      const div = document.createElement('div');
+      div.className = `log-entry log-${type}`;
+      const prefix = type === 'user' ? '🎤 You: ' : type === 'assistant' ? '🤖 AI: ' : type === 'tool' ? '' : '⚙️ ';
+      div.textContent = prefix + text;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function arrayBufferToBase64(buf) {
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }
+
+    function base64ToArrayBuffer(b64) {
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes.buffer;
+    }
+  </script>
+</body>
+</html>
