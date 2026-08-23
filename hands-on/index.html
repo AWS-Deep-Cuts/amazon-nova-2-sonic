@@ -313,6 +313,10 @@
     <div class="input-bar">
       <input type="text" id="text-input" placeholder="テキスト入力 (Enter送信) — Model-start-first等に使用" disabled>
       <button id="btn-send" disabled onclick="sendText()">Send</button>
+      <label style="display:flex;align-items:center;gap:4px;font-size:0.68rem;color:var(--text-dim);flex-shrink:0;">
+        Speed:<input type="range" id="speed-slider" min="0.5" max="1.5" step="0.05" value="1.0" style="width:70px;accent-color:var(--accent);">
+        <span id="speed-value">1.0x</span>
+      </label>
     </div>
   </div>
 
@@ -522,6 +526,9 @@
 
   // ─── Audio Playback ─────────────────────────────
   let scheduledSources = [];
+  const speedSlider = $('speed-slider');
+  const speedValue = $('speed-value');
+  speedSlider.addEventListener('input', () => { speedValue.textContent = parseFloat(speedSlider.value).toFixed(2) + 'x'; });
 
   function playAudio(b64) {
     if (!playCtx) { playCtx = new AudioContext({sampleRate:24000}); nextPlayTime = playCtx.currentTime; }
@@ -531,11 +538,16 @@
     const buf = playCtx.createBuffer(1, f32.length, 24000);
     buf.getChannelData(0).set(f32);
     const s = playCtx.createBufferSource();
-    s.buffer = buf; s.connect(playCtx.destination);
+    s.buffer = buf;
+    // 再生速度を適用（< 1.0 でスロー再生）
+    const rate = parseFloat(speedSlider.value);
+    s.playbackRate.value = rate;
+    s.connect(playCtx.destination);
     const now = playCtx.currentTime;
     if (nextPlayTime < now) nextPlayTime = now;
     s.start(nextPlayTime);
-    nextPlayTime += buf.duration;
+    // 実際の再生時間は duration / rate
+    nextPlayTime += buf.duration / rate;
     // 参照を保持して barge-in 時に停止可能にする
     scheduledSources.push(s);
     s.onended = () => { scheduledSources = scheduledSources.filter(x => x !== s); };

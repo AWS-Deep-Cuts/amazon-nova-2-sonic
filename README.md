@@ -21,7 +21,7 @@ AWS Deep Cutsは、AWS の最新のサービスやニッチな機能、または
 5. ターンテイキングと割り込み (barge-in) が自然に動作すること
 6. 話し方の抑揚・テンションが AI の応答スタイルにも影響すること
 7. Tool use で外部情報（今日の天気）を取得できること
-8. プロンプトで発話スピードを制御できること
+8. 発話スピード制御の制約を理解すること
 
 ## ハンズオン手順
 
@@ -181,13 +181,21 @@ xdg-open index.html
 
 **barge-in（割り込み）の確認:**
 1. `endpointingSensitivity` を `"MEDIUM"` に戻して Start
-2. 何か質問して AI に長めの応答をさせる（例: "Tell me everything you know about Japan"）
-3. **AI が話している最中に** 大きな声で割り込む（例: "Stop! I have a different question."）
-4. AI が発話を中断し、あなたの新しい質問に応答することを確認する
+2. AI に長い応答をさせる — 以下のように話しかける:
+   ```
+   "Tell me a long story about a cat who goes on an adventure"
+   ```
+3. **AI が物語を話している途中で**（3〜5秒後）、大きな声で割り込む:
+   ```
+   "Stop! What was the cat's name?"
+   ```
+4. 以下の 2 点を確認する:
+   - AI が即座に発話を中断すること（音声がぴたりと止まる）
+   - AI が中断前の内容を覚えており、猫の名前について回答すること（コンテキスト保持）
 
-**仕組み**: Nova 2 Sonic はビルトインの VAD (Voice Activity Detection) でターン検出を行います。barge-in 時はコンテキストを保持したまま現在の生成を中断し、新しいユーザー入力の処理を開始します。
+**仕組み**: Nova 2 Sonic はビルトインの VAD (Voice Activity Detection) でターン検出を行います。barge-in 時は `stopReason: "INTERRUPTED"` をクライアントに送信し、クライアント側で再生中の音声キューを即座にクリアします。コンテキストは保持されるため、中断前の話題について質問できます。
 
-参考: [Turn-taking Controllability](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-turn-taking.html) — endpointingSensitivity の詳細
+参考: [Barge-in](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-barge-in.html) / [Turn-taking Controllability](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-turn-taking.html)
 
 ---
 
@@ -220,21 +228,33 @@ xdg-open index.html
 
 ---
 
-#### 観点 8: 発話スピードの制御
+#### 観点 8: 発話スピードの制御（制約の確認）
 
 **確認手順:**
 1. System Prompt を以下に変更して Start:
    ```
    You are a helpful assistant. Speak very slowly and clearly, as if explaining to a young child. Take your time with each word.
    ```
-2. 何か質問して AI の応答スピードが遅いことを確認する
-3. Stop → System Prompt を以下に変更して再度 Start:
-   ```
-   You are an excited sports commentator. Speak extremely fast and energetically, like you're calling a thrilling game-winning play!
-   ```
-4. 同じ質問をして、AI の応答スピードが明らかに速くなることを確認する
+2. 何か質問する — **AI の発話スピードはほとんど変わらないことを確認する**
+3. Stop → 今度は自分が**非常にゆっくり**話しかけてみる（1単語ずつ区切って）
+4. AI の応答スピードが入力に合わせてやや遅くなることを確認する
 
-**ポイント**: Nova 2 Sonic はシステムプロンプトの指示に従って発話速度を調整できます。教育用途（ゆっくり明瞭に）やエンタメ用途（テンポよく）など、ユースケースに応じた制御が可能です。
+**制約（公式ドキュメントより）**: Nova 2 Sonic の発話スピードは**システムプロンプトで直接制御できません**。公式ドキュメントには以下のように明記されています:
+
+> "While you can't control voice parameters directly, you can influence how natural and engaging the spoken interaction feels through the content generated."
+>
+> — [System prompt authoring guidelines](https://docs.aws.amazon.com/nova/latest/userguide/prompting-speech-speech.html)
+
+発話スピードは、ユーザーの入力音声の韻律（prosody: ペース、抑揚、音量）に**適応的に調整**されます（観点6の Adaptive speech response）。つまり:
+
+| 制御したいこと | 方法 |
+| -- | -- |
+| AI の応答のスピード | ユーザー自身がゆっくり/早く話す（入力 prosody に適応） |
+| AI の応答の長さ | System Prompt で指示（"Keep responses to 1-2 sentences"） |
+| AI の言葉遣い・スタイル | System Prompt で指示 |
+| AI の声の高さ・速度パラメータ | **制御不可**（voiceId 固有の特性） |
+
+参考: [Voice conversation prompts](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-system-prompts.html) / [Prompting best practices](https://docs.aws.amazon.com/nova/latest/userguide/prompting-speech-best-practices.html)
 
 ---
 
