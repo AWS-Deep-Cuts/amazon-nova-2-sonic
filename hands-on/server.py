@@ -53,6 +53,9 @@ class SonicSession:
         self.audio_content_name = str(uuid.uuid4())
         self.is_active = False
         self.stream = None
+        # contentName → generationStage のマッピング (重複テキスト抑制用)
+        self._content_stages: dict[str, str] = {}
+        self._content_roles: dict[str, str] = {}
 
     async def start(self):
         self.is_active = True
@@ -275,10 +278,43 @@ class SonicSession:
 
         evt = data["event"]
 
-        # テキスト出力
+        # contentStart — generationStage を追跡
+        if "contentStart" in evt:
+            cs = evt["contentStart"]
+            content_name = cs.get("contentName", "")
+            role = cs.get("role", "")
+            self._content_roles[content_name] = role
+            # additionalModelFields に generationStage が含まれる
+            additional = cs.get("additionalModelFields")
+            if additional:
+                try:
+                    fields = json.loads(additional) if isinstance(additional, str) else additional
+                    stage = fields.get("generationStage", "")
+                    self._content_stages[content_name] = stage
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            return
+
+        # contentEnd — 追跡情報をクリーンアップ
+        if "contentEnd" in evt:
+            content_name = evt["contentEnd"].get("contentName", "")
+            self._content_stages.pop(content_name, None)
+            self._content_roles.pop(content_name, None)
+            return
+
+        # テキスト出力 — SPECULATIVE のみ表示し、確定版(FINAL)は無視して重複を防ぐ
         if "textOutput" in evt:
             content = evt["textOutput"].get("content", "")
             role = evt["textOutput"].get("role", "ASSISTANT")
+            content_name = evt["textOutput"].get("contentName", "")
+
+            # ASSISTANT ロールで generationStage が記録されている場合
+            if role == "ASSISTANT" and content_name in self._content_stages:
+                stage = self._content_stages[content_name]
+                # FINAL は SPECULATIVE と同じ内容なので無視
+                if stage == "FINAL":
+                    return
+
             if content.strip():
                 await self._send_ws({"type": "transcript", "role": role, "content": content})
 
