@@ -48,14 +48,6 @@
       align-items: center;
       gap: 12px;
     }
-    .badge {
-      font-size: 0.65rem;
-      padding: 3px 8px;
-      border-radius: 4px;
-      background: var(--surface-raised);
-      border: 1px solid var(--border);
-      color: var(--text-dim);
-    }
 
     /* ─── Main Layout ─── */
     .main {
@@ -284,32 +276,6 @@
     }
     .toggle-row input { width: 16px; height: 16px; accent-color: var(--accent); }
 
-    /* ─── Quick Settings (inline selects) ─── */
-    .quick-settings {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      padding: 8px 0;
-      border-top: 1px solid var(--border);
-      margin-top: 12px;
-    }
-    .quick-settings label {
-      font-size: 0.68rem;
-      color: var(--text-dim);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .quick-settings select {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      padding: 3px 6px;
-      font-size: 0.72rem;
-      outline: none;
-    }
-
     /* ─── Responsive ─── */
     @media (max-width: 600px) {
       .control-strip { flex-wrap: wrap; }
@@ -322,10 +288,7 @@
   <!-- Top Bar -->
   <div class="topbar">
     <h1>Nova 2 Sonic Playground</h1>
-    <div class="topbar-right">
-      <span class="badge" id="badge-voice">voice: matthew</span>
-      <span class="badge" id="badge-sensitivity">sensitivity: MEDIUM</span>
-    </div>
+    <div class="topbar-right"></div>
   </div>
 
   <!-- Main -->
@@ -371,41 +334,6 @@
         <textarea class="cfg prompt" id="system-prompt" spellcheck="false"></textarea>
       </div>
 
-      <!-- Voice & Sensitivity (quick access) -->
-      <div class="field">
-        <div class="field-label"><span>Voice &amp; Turn Detection</span></div>
-        <div class="quick-settings" style="border-top:none; margin-top:0; padding-top:0;">
-          <label>Voice:
-            <select id="sel-voice">
-              <option value="matthew">matthew (US/polyglot)</option>
-              <option value="tiffany">tiffany (US/polyglot)</option>
-              <option value="amy">amy (UK)</option>
-              <option value="olivia">olivia (AU)</option>
-              <option value="arjun">arjun (IN)</option>
-              <option value="kiara">kiara (IN)</option>
-              <option value="florian">florian (FR)</option>
-              <option value="ambre">ambre (FR)</option>
-              <option value="lennart">lennart (DE)</option>
-              <option value="tina">tina (DE)</option>
-              <option value="lupe">lupe (ES)</option>
-              <option value="carlos">carlos (ES)</option>
-              <option value="beatrice">beatrice (IT)</option>
-              <option value="lorenzo">lorenzo (IT)</option>
-              <option value="carolina">carolina (PT)</option>
-              <option value="leo">leo (PT)</option>
-            </select>
-          </label>
-          <label>Sensitivity:
-            <select id="sel-sensitivity">
-              <option value="LOW">LOW</option>
-              <option value="MEDIUM" selected>MEDIUM</option>
-              <option value="HIGH">HIGH</option>
-            </select>
-          </label>
-        </div>
-        <p class="field-note">Voice / Sensitivity はセッション開始時に適用されます（途中変更不可）</p>
-      </div>
-
       <!-- Tool use -->
       <div class="field">
         <div class="toggle-row">
@@ -417,17 +345,17 @@
       <!-- Advanced: Session Config -->
       <div class="field">
         <div class="field-label">
-          <span>Session Config (Advanced)</span>
+          <span>Session Config</span>
           <button onclick="resetSessionConfig()">Reset</button>
         </div>
         <textarea class="cfg json" id="session-config" spellcheck="false"></textarea>
-        <p class="field-note">inferenceConfiguration: maxTokens, topP, temperature</p>
+        <p class="field-note">inferenceConfiguration / turnDetectionConfiguration (endpointingSensitivity: LOW, MEDIUM, HIGH)</p>
       </div>
 
       <!-- Advanced: Prompt Config -->
       <div class="field">
         <div class="field-label">
-          <span>Prompt Config (Advanced)</span>
+          <span>Prompt Config</span>
           <button onclick="resetPromptConfig()">Reset</button>
         </div>
         <textarea class="cfg json" id="prompt-config" spellcheck="false"></textarea>
@@ -442,7 +370,8 @@
   const DEFAULTS = {
     systemPrompt: "You are a friendly English conversation partner. Keep responses short (1-2 sentences). Respond in the same language as the user.",
     sessionConfig: {
-      inferenceConfiguration: { maxTokens: 1024, topP: 0.9, temperature: 0.7 }
+      inferenceConfiguration: { maxTokens: 1024, topP: 0.9, temperature: 0.7 },
+      turnDetectionConfiguration: { endpointingSensitivity: "MEDIUM" }
     },
     promptConfig: {
       audioOutputConfiguration: {
@@ -469,13 +398,9 @@
   const systemPromptEl = $('system-prompt');
   const sessionConfigEl = $('session-config');
   const promptConfigEl = $('prompt-config');
-  const selVoice = $('sel-voice');
-  const selSensitivity = $('sel-sensitivity');
   const chkTools = $('chk-tools');
   const overlay = $('overlay');
   const settingsPanel = $('settings-panel');
-  const badgeVoice = $('badge-voice');
-  const badgeSensitivity = $('badge-sensitivity');
   const promptPreviewText = $('prompt-preview-text');
 
   // ─── State ──────────────────────────────────────
@@ -486,43 +411,25 @@
   resetSystemPrompt();
   resetSessionConfig();
   resetPromptConfig();
-  updateBadges();
   updatePromptPreview();
 
   systemPromptEl.addEventListener('input', updatePromptPreview);
-  selVoice.addEventListener('change', () => { syncVoiceToConfig(); updateBadges(); });
-  selSensitivity.addEventListener('change', updateBadges);
 
   btnMic.addEventListener('click', () => isStreaming ? stop() : start());
   textInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendText(); } });
 
   // ─── Settings Panel ─────────────────────────────
   function openSettings() { overlay.classList.add('open'); settingsPanel.classList.add('open'); }
-  function closeSettings() { overlay.classList.remove('open'); settingsPanel.classList.remove('open'); updateBadges(); updatePromptPreview(); }
+  function closeSettings() { overlay.classList.remove('open'); settingsPanel.classList.remove('open'); updatePromptPreview(); }
 
   // ─── Reset Functions ────────────────────────────
   function resetSystemPrompt() { systemPromptEl.value = DEFAULTS.systemPrompt; updatePromptPreview(); }
   function resetSessionConfig() { sessionConfigEl.value = JSON.stringify(DEFAULTS.sessionConfig, null, 2); }
   function resetPromptConfig() {
     promptConfigEl.value = JSON.stringify(DEFAULTS.promptConfig, null, 2);
-    selVoice.value = 'matthew';
-    updateBadges();
-  }
-
-  // ─── Sync voice select → JSON ──────────────────
-  function syncVoiceToConfig() {
-    try {
-      const cfg = JSON.parse(promptConfigEl.value);
-      cfg.audioOutputConfiguration.voiceId = selVoice.value;
-      promptConfigEl.value = JSON.stringify(cfg, null, 2);
-    } catch(e) {}
   }
 
   // ─── UI Updates ─────────────────────────────────
-  function updateBadges() {
-    badgeVoice.textContent = `voice: ${selVoice.value}`;
-    badgeSensitivity.textContent = `sensitivity: ${selSensitivity.value}`;
-  }
   function updatePromptPreview() {
     const text = systemPromptEl.value.replace(/\n/g, ' ');
     promptPreviewText.textContent = text || '(empty)';
@@ -534,9 +441,6 @@
     let sessionConfig, promptConfig;
     try { sessionConfig = JSON.parse(sessionConfigEl.value); } catch(e) { addLog('system','Session Config JSON error'); openSettings(); return; }
     try { promptConfig = JSON.parse(promptConfigEl.value); } catch(e) { addLog('system','Prompt Config JSON error'); openSettings(); return; }
-
-    // Add sensitivity to session config
-    sessionConfig.turnDetectionConfiguration = { endpointingSensitivity: selSensitivity.value };
 
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate:16000, channelCount:1, echoCancellation:true, noiseSuppression:true } });
@@ -551,7 +455,7 @@
         ws.send(JSON.stringify({ type: 'start', config: { sessionConfig, promptConfig, systemPrompt: systemPromptEl.value, enableTools: chkTools.checked } }));
         isStreaming = true;
         setUI('active');
-        addLog('system', `Started — ${selVoice.value} / ${selSensitivity.value}`);
+        addLog('system', 'Started');
 
         processor.onaudioprocess = e => {
           if (!isStreaming || !ws || ws.readyState !== 1) return;
@@ -573,6 +477,7 @@
     if (processor) { processor.disconnect(); processor = null; }
     if (audioCtx) { audioCtx.close(); audioCtx = null; }
     if (mediaStream) { mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; }
+    clearAudioQueue();
     setUI('idle');
     addLog('system', 'Stopped');
   }
@@ -608,6 +513,7 @@
     switch(msg.type) {
       case 'transcript': addLog(msg.role==='USER'?'user':'assistant', msg.content); break;
       case 'audio': playAudio(msg.data); break;
+      case 'clearAudio': clearAudioQueue(); break;
       case 'toolCall': addLog('tool', `Tool: ${msg.toolName}(${msg.params})`); break;
       case 'state': if(msg.state==='ended') addLog('system','Session ended (timeout or error)'); break;
       case 'error': addLog('system', msg.message); break;
@@ -615,6 +521,8 @@
   }
 
   // ─── Audio Playback ─────────────────────────────
+  let scheduledSources = [];
+
   function playAudio(b64) {
     if (!playCtx) { playCtx = new AudioContext({sampleRate:24000}); nextPlayTime = playCtx.currentTime; }
     const i16 = new Int16Array(b64ToArr(b64));
@@ -628,6 +536,18 @@
     if (nextPlayTime < now) nextPlayTime = now;
     s.start(nextPlayTime);
     nextPlayTime += buf.duration;
+    // 参照を保持して barge-in 時に停止可能にする
+    scheduledSources.push(s);
+    s.onended = () => { scheduledSources = scheduledSources.filter(x => x !== s); };
+  }
+
+  function clearAudioQueue() {
+    // barge-in: スケジュール済み音声を即座に停止
+    for (const s of scheduledSources) {
+      try { s.stop(); } catch(e) {}
+    }
+    scheduledSources = [];
+    if (playCtx) nextPlayTime = playCtx.currentTime;
   }
 
   // ─── Log ────────────────────────────────────────

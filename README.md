@@ -110,49 +110,84 @@ xdg-open index.html
 #### 観点 3: 話者 (voiceId) の変更
 
 **確認手順:**
-1. Prompt Config の `audioOutputConfiguration.voiceId` を `"matthew"` にして Start → 何か話す → Stop
-2. `voiceId` を `"tiffany"` に変えて Start → 同じことを話す → Stop
-3. `voiceId` を `"amy"` に変えて Start → 同じことを話す → Stop
+1. Settings を開き、Prompt Config の `audioOutputConfiguration.voiceId` を確認する（デフォルト: `"matthew"`）
+2. Start → 何か話す → 声を確認 → Stop
+3. Prompt Config の `voiceId` を `"tiffany"` に書き換えて Start → 同じことを話す → Stop
+4. `voiceId` を `"amy"` に書き換えて Start → 同じことを話す → Stop
+
+```json
+{
+  "audioOutputConfiguration": {
+    "mediaType": "audio/lpcm",
+    "sampleRateHertz": 24000,
+    "sampleSizeBits": 16,
+    "channelCount": 1,
+    "voiceId": "tiffany",
+    "encoding": "base64",
+    "audioType": "SPEECH"
+  },
+  "textOutputConfiguration": { "mediaType": "text/plain" }
+}
+```
 
 **確認ポイント**: 同じプロンプト・同じ質問でも、voiceId によって声質・アクセントが明確に変わることを確認してください。
 
 **制約**: voiceId はセッション開始時に決定され、セッション途中で変更できません（1 セッション = 1 voice）。
 
+参考: [Language Support & Voices](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-language-support.html) — 利用可能な voiceId 一覧
+
 ---
 
 #### 観点 4: 言語の変更（ポリグロット）
 
-**確認手順:**
-1. Prompt Config の `voiceId` を `"matthew"` (ポリグロット) にする
+**確認手順 A — サポート言語（スペイン語）:**
+1. Prompt Config の `voiceId` が `"matthew"` (ポリグロット) であることを確認する
 2. System Prompt を以下に変更:
    ```
-   You are a helpful assistant. Always respond in French.
+   You are a helpful assistant. Always respond in Spanish. Start by saying "¡Hola! ¿Cómo estás?"
    ```
-3. Start → 英語で話しかける（例: "What's your favorite food?"）
-4. AI が**フランス語で**応答することを確認する
-5. Stop → System Prompt を `Always respond in Spanish.` に変えて再度 Start
-6. AI がスペイン語で応答することを確認する
+3. Start → テキスト入力バーから `Start` と送信する
+4. AI が**スペイン語で** "¡Hola! ¿Cómo estás?"（オラ！コモ エスタス？）と発話することを確認する
 
-**ポイント**: matthew と tiffany はポリグロットボイスで、voiceId を変えずに 7 言語（英/仏/伊/独/西/葡/ヒンディー）を話せます。amy など非ポリグロットボイスでは、対応言語以外を指定すると英語にフォールバックします。
+**確認手順 B — 非サポート言語（日本語）:**
+1. Stop → System Prompt を以下に変更:
+   ```
+   You are a helpful assistant. Always respond in Japanese. Start by saying "こんにちは！"
+   ```
+2. Start → テキスト入力バーから `Start` と送信する
+3. AI の挙動を確認する — 日本語は公式サポート言語ではないため、英語にフォールバックする、または不安定な発音になることがある
+
+**ポイント**: matthew と tiffany はポリグロットボイスで、voiceId を変えずに 7 言語（英/仏/伊/独/西/葡/ヒンディー）を話せます。日本語・中国語・韓国語などは公式サポート外です。
+
+参考: [Language Support & Voices](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-language-support.html)
 
 ---
 
 #### 観点 5: ターンテイキングと割り込み (barge-in)
 
 **ターンテイキングの確認:**
-1. Session Config の `endpointingSensitivity` を `"LOW"` に設定して Start
+1. Settings を開き、Session Config の `turnDetectionConfiguration.endpointingSensitivity` を `"LOW"` に書き換えて Start
 2. ゆっくり、途中で 2〜3 秒ポーズを入れながら話す（例: "I think... um... maybe... we should..."）
 3. AI がポーズ中に割り込まず、発話完了を待つことを確認する
-4. Stop → `endpointingSensitivity` を `"HIGH"` にして同じことを試す
+4. Stop → `endpointingSensitivity` を `"HIGH"` に書き換えて同じことを試す
 5. AI が短いポーズで即座に応答を始めることを確認する
 
+```json
+{
+  "inferenceConfiguration": { "maxTokens": 1024, "topP": 0.9, "temperature": 0.7 },
+  "turnDetectionConfiguration": { "endpointingSensitivity": "LOW" }
+}
+```
+
 **barge-in（割り込み）の確認:**
-1. `endpointingSensitivity` を `"MEDIUM"` にして Start
+1. `endpointingSensitivity` を `"MEDIUM"` に戻して Start
 2. 何か質問して AI に長めの応答をさせる（例: "Tell me everything you know about Japan"）
 3. **AI が話している最中に** 大きな声で割り込む（例: "Stop! I have a different question."）
 4. AI が発話を中断し、あなたの新しい質問に応答することを確認する
 
 **仕組み**: Nova 2 Sonic はビルトインの VAD (Voice Activity Detection) でターン検出を行います。barge-in 時はコンテキストを保持したまま現在の生成を中断し、新しいユーザー入力の処理を開始します。
+
+参考: [Turn-taking Controllability](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-turn-taking.html) — endpointingSensitivity の詳細
 
 ---
 

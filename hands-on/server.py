@@ -295,11 +295,15 @@ class SonicSession:
                     pass
             return
 
-        # contentEnd — 追跡情報をクリーンアップ
+        # contentEnd — 追跡情報をクリーンアップ + barge-in 検知
         if "contentEnd" in evt:
             content_name = evt["contentEnd"].get("contentName", "")
+            stop_reason = evt["contentEnd"].get("stopReason", "")
             self._content_stages.pop(content_name, None)
             self._content_roles.pop(content_name, None)
+            # barge-in: stopReason が INTERRUPTED なら音声キューをクリアさせる
+            if stop_reason == "INTERRUPTED":
+                await self._send_ws({"type": "clearAudio"})
             return
 
         # テキスト出力 — SPECULATIVE のみ表示し、確定版(FINAL)は無視して重複を防ぐ
