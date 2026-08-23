@@ -414,6 +414,16 @@
         </div>
       </div>
 
+      <!-- Model-start-first -->
+      <div class="field">
+        <div class="toggle-row">
+          <input type="checkbox" id="chk-start-first">
+          <label for="chk-start-first">Model-start-first (AI から先に話しかける)</label>
+        </div>
+        <textarea class="cfg prompt" id="initial-message" spellcheck="false" style="min-height:60px; margin-top:8px;"></textarea>
+        <p class="field-note">有効時、セッション開始直後にこのテキストをクロスモーダル入力として送信し、AI に発話を促します。</p>
+      </div>
+
       <!-- Advanced: Session Config -->
       <div class="field">
         <div class="field-label">
@@ -441,6 +451,7 @@
   // ─── Defaults ───────────────────────────────────
   const DEFAULTS = {
     systemPrompt: "You are a friendly English conversation partner. Keep responses short (1-2 sentences). Respond in the same language as the user.",
+    initialMessage: "Hello! Please greet me.",
     sessionConfig: {
       inferenceConfiguration: { maxTokens: 1024, topP: 0.9, temperature: 0.7 }
     },
@@ -472,6 +483,8 @@
   const selVoice = $('sel-voice');
   const selSensitivity = $('sel-sensitivity');
   const chkTools = $('chk-tools');
+  const chkStartFirst = $('chk-start-first');
+  const initialMessageEl = $('initial-message');
   const overlay = $('overlay');
   const settingsPanel = $('settings-panel');
   const badgeVoice = $('badge-voice');
@@ -486,6 +499,7 @@
   resetSystemPrompt();
   resetSessionConfig();
   resetPromptConfig();
+  initialMessageEl.value = DEFAULTS.initialMessage;
   updateBadges();
   updatePromptPreview();
 
@@ -548,10 +562,14 @@
 
       ws = new WebSocket('ws://127.0.0.1:8765');
       ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'start', config: { sessionConfig, promptConfig, systemPrompt: systemPromptEl.value, enableTools: chkTools.checked } }));
+        const startConfig = { sessionConfig, promptConfig, systemPrompt: systemPromptEl.value, enableTools: chkTools.checked };
+        if (chkStartFirst.checked && initialMessageEl.value.trim()) {
+          startConfig.initialMessage = initialMessageEl.value.trim();
+        }
+        ws.send(JSON.stringify({ type: 'start', config: startConfig }));
         isStreaming = true;
         setUI('active');
-        addLog('system', `Started — ${selVoice.value} / ${selSensitivity.value}`);
+        addLog('system', `Started — ${selVoice.value} / ${selSensitivity.value}${chkStartFirst.checked ? ' / model-start-first' : ''}`);
 
         processor.onaudioprocess = e => {
           if (!isStreaming || !ws || ws.readyState !== 1) return;

@@ -15,7 +15,7 @@ AWS Deep Cutsは、AWS の最新のサービスやニッチな機能、または
 このハンズオンでは、ローカル PC 上に Nova 2 Sonic のプレイグラウンドを構築し、**プロンプトを自由に書き換えながら** 以下の 8 つの観点を確認します。
 
 1. 通常のプロンプトでは AI が自分から話しかけてこないこと
-2. 特殊なプロンプト (Model-start-first) で AI から先に話しかけてくれること
+2. クロスモーダル入力 (Model-start-first) で AI から先に話しかけてくれること
 3. 話者 (voiceId) を変更できること
 4. 言語を変更できること（ポリグロットボイス）
 5. ターンテイキングと割り込み (barge-in) が自然に動作すること
@@ -90,17 +90,24 @@ xdg-open index.html
 
 ---
 
-#### 観点 2: 特殊プロンプトで AI から先に話しかけさせる
+#### 観点 2: Model-start-first で AI から先に話しかけさせる
 
 **確認手順:**
-1. System Prompt を以下に書き換える:
+1. Settings を開き、「Model-start-first (AI から先に話しかける)」にチェックを入れる
+2. 初期メッセージ欄に以下を入力する（デフォルトのままでも可）:
    ```
-   You are a friendly English tutor. As soon as the session begins, greet the student by saying "Hello! Welcome to today's English lesson. How are you feeling today?" Do not wait for the user to speak first.
+   Hello! Please greet me.
    ```
-2. 「Start」を押す
-3. **何も話さずに待つ** — AI が自発的に挨拶を開始することを確認する
+3. System Prompt を以下に書き換える:
+   ```
+   You are a friendly English tutor. When the user asks you to greet them, say "Hello! Welcome to today's English lesson. How are you feeling today?"
+   ```
+4. 「Start」を押す
+5. **何も話さずに待つ** — AI が自発的に挨拶を開始することを確認する
 
-**仕組み**: Nova 2 Sonic はシステムプロンプトで「最初に話せ」と指示されると、音声入力ストリームが開始された直後に発話を開始します。これが "Model-start-first" パターンです。
+**仕組み**: Nova 2 Sonic は通常、ユーザーの音声入力を検知するまで応答しません。"Model-start-first" を実現するには、セッション開始直後に**クロスモーダルテキスト入力**（Cross-modal input）をユーザー発話として送信し、モデルに応答を促します。システムプロンプトだけでは不十分で、この「トリガーとなるテキストメッセージ」が必須です。
+
+参考: [AWS 公式ドキュメント - Cross-modal input](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-cross-modal.html)
 
 ---
 
@@ -212,17 +219,11 @@ Nova 2 Sonic は Bedrock のオンデマンド API のため、AWS リソース�
 
 ## アーキテクチャ
 
-```
-┌──────────────────┐    WebSocket     ┌──────────────────┐    Bedrock API    ┌────────────────┐
-│  index.html      │ ←─────────────→  │  server.py       │ ←──────────────→  │  Nova 2 Sonic  │
-│  (ブラウザ)       │  ws://127.0.0.1  │  (localhost)     │                   │                │
-│  マイク入力/再生   │                  │  ツール実行       │                   │                │
-└──────────────────┘                   └───────┬──────────┘                   └────────────────┘
-                                               │
-                                               ↓ HTTP
-                                       ┌──────────────┐
-                                       │ 気象庁 API    │
-                                       └──────────────┘
+```mermaid
+graph LR
+    A[index.html<br/>ブラウザ<br/>マイク入力/再生] -->|WebSocket<br/>ws://127.0.0.1:8765| B[server.py<br/>localhost<br/>ツール実行]
+    B -->|Bedrock API| C[Nova 2 Sonic]
+    B -->|HTTP| D[気象庁 API]
 ```
 
 - **セキュリティ**: server.py は `127.0.0.1` にのみバインド。外部ネットワークからアクセスできません。
