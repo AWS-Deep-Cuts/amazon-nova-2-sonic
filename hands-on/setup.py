@@ -42,26 +42,31 @@ def print_header():
 
 def check_and_install_packages():
     """Step 3: 必要パッケージの確認・インストール"""
-    required = ["boto3", "websockets"]
-    missing = []
-    for pkg in required:
+    # パッケージ名 → import名 のマッピング
+    required = {
+        "boto3": "boto3",
+        "websockets": "websockets",
+        "aws-sdk-bedrock-runtime": "aws_sdk_bedrock_runtime",
+    }
+    missing_pip = []
+    for pip_name, import_name in required.items():
         try:
-            importlib.import_module(pkg)
+            importlib.import_module(import_name)
         except ImportError:
-            missing.append(pkg)
+            missing_pip.append(pip_name)
 
-    if missing:
-        print(f"  インストール中: {', '.join(missing)}...")
+    if missing_pip:
+        print(f"  インストール中: {', '.join(missing_pip)}...")
         subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "--quiet"] + missing,
+            [sys.executable, "-m", "pip", "install", "--quiet"] + missing_pip,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         # 再度インポートテスト
-        for pkg in missing:
-            importlib.import_module(pkg)
+        for pip_name, import_name in required.items():
+            importlib.import_module(import_name)
 
-    print("  boto3, websockets: OK ✓")
+    print("  boto3, websockets, aws-sdk-bedrock-runtime: OK ✓")
 
 
 def check_auth():
