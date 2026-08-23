@@ -174,11 +174,6 @@ class SonicSession:
             }
         })
 
-        # 5. Model-start-first: クロスモーダルテキスト入力でモデルに発話を促す
-        initial_message = self.config.get("initialMessage", "")
-        if initial_message:
-            await self.inject_text(initial_message)
-
         # レスポンス処理タスク開始
         asyncio.create_task(self._process_responses())
 

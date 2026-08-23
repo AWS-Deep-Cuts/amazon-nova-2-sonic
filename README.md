@@ -93,21 +93,17 @@ xdg-open index.html
 #### 観点 2: Model-start-first で AI から先に話しかけさせる
 
 **確認手順:**
-1. Settings を開き、「Model-start-first (AI から先に話しかける)」にチェックを入れる
-2. 初期メッセージ欄に以下を入力する（デフォルトのままでも可）:
+1. System Prompt を以下に書き換える:
    ```
-   Hello! Please greet me.
+   You are a friendly English tutor. As soon as the conversation starts, greet the student by saying "Hello! Welcome to today's English lesson. How are you feeling today?" Do not wait for the user to speak first.
    ```
-3. System Prompt を以下に書き換える:
-   ```
-   You are a friendly English tutor. When the user asks you to greet them, say "Hello! Welcome to today's English lesson. How are you feeling today?"
-   ```
-4. 「Start」を押す
-5. **何も話さずに待つ** — AI が自発的に挨拶を開始することを確認する
+2. 「Start」を押す
+3. 画面下部のテキスト入力バーに `Start` と入力して Enter（Send）を押す
+4. **何も話さずに待つ** — AI が System Prompt で指定した挨拶を音声で開始することを確認する
 
-**仕組み**: Nova 2 Sonic は通常、ユーザーの音声入力を検知するまで応答しません。"Model-start-first" を実現するには、セッション開始直後に**クロスモーダルテキスト入力**（Cross-modal input）をユーザー発話として送信し、モデルに応答を促します。システムプロンプトだけでは不十分で、この「トリガーとなるテキストメッセージ」が必須です。
+**仕組み**: Nova 2 Sonic は何らかのユーザー入力がなければ応答を生成しません。音声の代わりに**テキスト入力バーから短いメッセージを送信**することで、モデルに「今話し始めてよい」と合図できます。発話の内容を決めるのはあくまで System Prompt であり、テキスト入力は発火トリガーに過ぎません。
 
-参考: [AWS 公式ドキュメント - Cross-modal input](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-cross-modal.html)
+これが [Cross-modal input](https://docs.aws.amazon.com/nova/latest/nova2-userguide/sonic-cross-modal.html) を利用した "Model-start-first" パターンです。
 
 ---
 
